@@ -1,39 +1,68 @@
 const WebSocket = require('ws');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
-const TOKEN = process.env.BOT_TOKEN ? process.env.BOT_TOKEN.trim() : '';
-const API_URL = 'https://api.revolt.chat';
+const { WS_URL, PING_INTERVAL_MS, RECONEXION_MS } = require('./config/constantes');
+const { TOKEN } = require('./servicios/api');
+const eventos = require('./eventos');
 
 if (!TOKEN) {
-    console.error('❌ Error: No se encontró BOT_TOKEN en el archivo .env');
+    console.error('❌ Error: No se encontró BOT_TOKEN o TOKEN en el archivo .env');
     process.exit(1);
 }
 
-// Función universal para enviar mensajes al chat
-async function enviarMensaje(channelId, contenido) {
-    try {
-        const response = await fetch(`${API_URL}/channels/${channelId}/messages`, {
-            method: 'POST',
-            headers: {
-                'x-bot-token': TOKEN,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ content: contenido })
-        });
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error('❌ Error enviando mensaje HTTP:', response.status, errText);
-        } else {
-            console.log('✅ Mensaje enviado al chat');
+// Map para almacenar los comandos cargados
+const commands = new Map();
+
+// Función para cargar comandos de forma recursiva
+function cargarComandos(directorio, esAdminFolder = false) {
+    if (!fs.existsSync(directorio)) {
+        fs.mkdirSync(directorio, { recursive: true });
+        return;
+    }
+
+    const elementos = fs.readdirSync(directorio, { withFileTypes: true });
+
+    for (const elemento of elementos) {
+        const rutaAbsoluta = path.join(directorio, elemento.name);
+
+        if (elemento.isDirectory()) {
+            // Si es la subcarpeta "admin", activamos el flag esAdminFolder
+            const esSubAdmin = esAdminFolder || elemento.name.toLowerCase() === 'admin';
+            cargarComandos(rutaAbsoluta, esSubAdmin);
+        } else if (elemento.isFile() && elemento.name.endsWith('.js')) {
+            // Cargar el comando
+            delete require.cache[require.resolve(rutaAbsoluta)]; // Limpiar caché por si hay reinicios
+            const comando = require(rutaAbsoluta);
+
+            // Si está dentro de la carpeta admin (o subcarpetas de esta), forzamos soloAdmin
+            if (esAdminFolder) {
+                comando.soloAdmin = true;
+            }
+
+            commands.set(comando.nombre, comando);
+
+            const etiquetaAdmin = comando.soloAdmin ? '🔒 [ADMIN]' : '🌐 [PÚBLICO]';
+            console.log(`✅ Comando cargado: !${comando.nombre} ${etiquetaAdmin}`);
         }
-    } catch (error) {
-        console.error('❌ Error de red:', error);
     }
 }
 
+// Cargar todos los comandos desde la carpeta principal
+cargarComandos(path.join(__dirname, 'comandos'));
+
 function conectarBot() {
-    const ws = new WebSocket('wss://ws.revolt.chat');
-    let miBotId = null; // Guardamos el ID del bot para ignorar sus propios mensajes
+    const ws = new WebSocket(WS_URL);
+    let miBotId = null;
+    let pingInterval = null;
+
+    // Contexto compartido que se pasa a cada handler de evento
+    const ctx = {
+        commands,
+        getBotId: () => miBotId,
+        setBotId: (id) => { miBotId = id; },
+    };
 
     ws.on('open', () => {
         console.log('🔗 Conectando WebSocket a Stoat...');
@@ -41,74 +70,21 @@ function conectarBot() {
             type: 'Authenticate',
             token: TOKEN
         }));
+
+        // Mantener la conexión con un Ping de vida
+        pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'Ping', data: Date.now() }));
+            }
+        }, PING_INTERVAL_MS);
     });
 
     ws.on('message', async (data) => {
         try {
-            const evento = JSON.parse(data.toString());
-
-            // Al autenticar, guardamos los datos del bot
-            if (evento.type === 'Authenticated') {
-                console.log('🤖 ¡KAT está VIVO Y AUTENTICADO EXITOSAMENTE!');
-                console.log('📌 Comandos activos: !ping, !hola, !dado, !8ball, !chiste');
-            }
-
-            if (evento.type === 'Ready') {
-                // Guardamos el ID de nuestro bot para no respondernos a nosotros mismos
-                if (evento.users) {
-                    const botUser = evento.users.find(u => u.bot);
-                    if (botUser) miBotId = botUser._id;
-                }
-            }
-
-            // Detectar mensajes nuevos
-            if (evento.type === 'Message') {
-                // Ignorar si el mensaje lo envió el propio bot
-                if (evento.author === miBotId) return;
-
-                const texto = typeof evento.content === 'string' ? evento.content.trim() : '';
-                console.log(`💬 Mensaje recibido: "${texto}" en canal: ${evento.channel}`);
-
-                // COMANDO: !ping
-                if (texto === '!ping') {
-                    await enviarMensaje(evento.channel, '¡Pong! 🏓 ¡Estoy vivo y veloz!');
-                }
-
-                // COMANDO: !hola
-                else if (texto === '!hola') {
-                    await enviarMensaje(evento.channel, '¡Holaaa! 👋 ¿Cómo estás?');
-                }
-
-                // COMANDO: !dado
-                else if (texto === '!dado') {
-                    const numero = Math.floor(Math.random() * 6) + 1;
-                    await enviarMensaje(evento.channel, `🎲 Sacaste un: **${numero}**`);
-                }
-
-                // COMANDO: !8ball
-                else if (texto.startsWith('!8ball')) {
-                    const respuestas = [
-                        'Sí, totalmente. 🔮',
-                        'No lo creo... ❌',
-                        'Definitivamente sí. ✨',
-                        'Pregúntame más tarde, estoy durmiendo. 😴',
-                        'Mis fuentes dicen que no. 🤫',
-                        '¡Por supuesto que sí! 🔥'
-                    ];
-                    const aleatorio = respuestas[Math.floor(Math.random() * respuestas.length)];
-                    await enviarMensaje(evento.channel, `🎱 **Bola Mágica:** ${aleatorio}`);
-                }
-
-                // COMANDO: !chiste
-                else if (texto === '!chiste') {
-                    const chistes = [
-                        '¿Qué le dice un bit a otro? Nos vemos en el bus. 😂',
-          '¿Por qué los pájaros no usan Facebook? Porque ya tienen Twitter. 🐦',
-          'Hay 10 tipos de personas en el mundo: las que entienden binario y las que no. 🤓'
-                    ];
-                    const chiste = chistes[Math.floor(Math.random() * chistes.length)];
-                    await enviarMensaje(evento.channel, `🤖 ${chiste}`);
-                }
+            const evento = JSON.parse(data);
+            const handler = eventos.get(evento.type);
+            if (handler) {
+                await handler(evento, ctx);
             }
         } catch (e) {
             console.error('⚠️ Error procesando evento:', e);
@@ -116,8 +92,9 @@ function conectarBot() {
     });
 
     ws.on('close', () => {
-        console.log('⚠️ Conexión cerrada. Reintentando en 3 segundos...');
-        setTimeout(conectarBot, 3000);
+        console.log(`⚠️ Conexión cerrada. Reintentando en ${RECONEXION_MS / 1000} segundos...`);
+        clearInterval(pingInterval);
+        setTimeout(conectarBot, RECONEXION_MS);
     });
 
     ws.on('error', (err) => {
