@@ -5,6 +5,7 @@ require('dotenv').config();
 const { WS_URL, PING_INTERVAL_MS, RECONEXION_MS } = require('./config/constantes');
 const { TOKEN } = require('./servicios/api');
 const { commands, cargarComandos } = require('./utilidades/cargadorComandos');
+const { iniciarSchedulerRecordatorios } = require('./servicios/scheduler');
 const eventos = require('./eventos');
 
 if (!TOKEN) {
@@ -14,6 +15,10 @@ if (!TOKEN) {
 
 // Cargar todos los comandos desde la carpeta principal
 cargarComandos(path.join(__dirname, 'comandos'));
+
+// El scheduler corre independiente del WebSocket: usa la API REST directamente,
+// así que sigue revisando recordatorios incluso si el WS se está reconectando.
+iniciarSchedulerRecordatorios();
 
 function conectarBot() {
     const ws = new WebSocket(WS_URL);
