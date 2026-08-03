@@ -100,30 +100,22 @@ async function obtenerMensajes(channelId, limite) {
  */
 async function esAdministrador(channelId, userId) {
     try {
-        const chRes = await fetch(`${API_URL}/channels/${channelId}`, {
-            headers: { 'x-bot-token': TOKEN }
-        });
-        if (!chRes.ok) return false;
-        const channelData = await chRes.json();
+        const channelData = await obtenerCanal(channelId);
+        if (!channelData) return false;
 
         if (!channelData.server) return true; // DM / canal privado
 
-        const serverRes = await fetch(`${API_URL}/servers/${channelData.server}`, {
-            headers: { 'x-bot-token': TOKEN }
-        });
-        if (!serverRes.ok) return false;
-        const serverData = await serverRes.json();
+        const serverData = await obtenerServidor(channelData.server);
+        if (!serverData) return false;
 
         if (serverData.owner === userId) return true;
 
-        const memberRes = await fetch(`${API_URL}/servers/${channelData.server}/members/${userId}`, {
-            headers: { 'x-bot-token': TOKEN }
-        });
-        if (!memberRes.ok) return false;
+        const memberData = await obtenerMiembro(channelData.server, userId);
+        if (!memberData) return false;
 
         // NOTA: esto retorna true para cualquier miembro válido, igual que el original.
         // Si luego quieres exigir un rol de admin específico, aquí es donde se revisaría
-        // memberRes.roles contra un ID de rol configurado.
+        // memberData.roles contra un ID de rol configurado.
         return true;
     } catch (e) {
         console.error('❌ Error verificando permisos:', e);
@@ -131,11 +123,94 @@ async function esAdministrador(channelId, userId) {
     }
 }
 
+/**
+ * Edita el contenido de un mensaje ya enviado por el bot.
+ */
+async function editarMensaje(channelId, messageId, contenido) {
+    try {
+        const bodyData = typeof contenido === 'string' ? { content: contenido } : contenido;
+        const res = await fetch(`${API_URL}/channels/${channelId}/messages/${messageId}`, {
+            method: 'PATCH',
+            headers: {
+                'x-bot-token': TOKEN,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bodyData)
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('❌ Error editando mensaje:', error);
+        return false;
+    }
+}
+
+/**
+ * Obtiene la info de un canal (incluye a qué server pertenece, si aplica).
+ */
+async function obtenerCanal(channelId) {
+    const res = await fetch(`${API_URL}/channels/${channelId}`, {
+        headers: { 'x-bot-token': TOKEN }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+}
+
+/**
+ * Obtiene la info de un servidor por su ID.
+ */
+async function obtenerServidor(serverId) {
+    const res = await fetch(`${API_URL}/servers/${serverId}`, {
+        headers: { 'x-bot-token': TOKEN }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+}
+
+/**
+ * Lista los miembros de un servidor. Devuelve { members: [...], users: [...] }.
+ */
+async function obtenerMiembrosServidor(serverId) {
+    const res = await fetch(`${API_URL}/servers/${serverId}/members`, {
+        headers: { 'x-bot-token': TOKEN }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+}
+
+/**
+ * Obtiene el perfil "global" de un usuario (no ligado a un server en específico).
+ */
+async function obtenerUsuario(userId) {
+    const res = await fetch(`${API_URL}/users/${userId}`, {
+        headers: { 'x-bot-token': TOKEN }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+}
+
+/**
+ * Obtiene los datos de membresía de un usuario dentro de un servidor
+ * (fecha en la que se unió, apodo, roles, etc).
+ */
+async function obtenerMiembro(serverId, userId) {
+    const res = await fetch(`${API_URL}/servers/${serverId}/members/${userId}`, {
+        headers: { 'x-bot-token': TOKEN }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+}
+
 module.exports = {
     TOKEN,
     enviarMensaje,
+    editarMensaje,
     eliminarMensaje,
     eliminarMensajesEnBloque,
     obtenerMensajes,
+    obtenerCanal,
+    obtenerServidor,
+    obtenerMiembrosServidor,
+    obtenerUsuario,
+    obtenerMiembro,
     esAdministrador,
 };

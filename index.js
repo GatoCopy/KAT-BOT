@@ -1,52 +1,15 @@
 const WebSocket = require('ws');
-const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
 const { WS_URL, PING_INTERVAL_MS, RECONEXION_MS } = require('./config/constantes');
 const { TOKEN } = require('./servicios/api');
+const { commands, cargarComandos } = require('./utilidades/cargadorComandos');
 const eventos = require('./eventos');
 
 if (!TOKEN) {
     console.error('❌ Error: No se encontró BOT_TOKEN o TOKEN en el archivo .env');
     process.exit(1);
-}
-
-// Map para almacenar los comandos cargados
-const commands = new Map();
-
-// Función para cargar comandos de forma recursiva
-function cargarComandos(directorio, esAdminFolder = false) {
-    if (!fs.existsSync(directorio)) {
-        fs.mkdirSync(directorio, { recursive: true });
-        return;
-    }
-
-    const elementos = fs.readdirSync(directorio, { withFileTypes: true });
-
-    for (const elemento of elementos) {
-        const rutaAbsoluta = path.join(directorio, elemento.name);
-
-        if (elemento.isDirectory()) {
-            // Si es la subcarpeta "admin", activamos el flag esAdminFolder
-            const esSubAdmin = esAdminFolder || elemento.name.toLowerCase() === 'admin';
-            cargarComandos(rutaAbsoluta, esSubAdmin);
-        } else if (elemento.isFile() && elemento.name.endsWith('.js')) {
-            // Cargar el comando
-            delete require.cache[require.resolve(rutaAbsoluta)]; // Limpiar caché por si hay reinicios
-            const comando = require(rutaAbsoluta);
-
-            // Si está dentro de la carpeta admin (o subcarpetas de esta), forzamos soloAdmin
-            if (esAdminFolder) {
-                comando.soloAdmin = true;
-            }
-
-            commands.set(comando.nombre, comando);
-
-            const etiquetaAdmin = comando.soloAdmin ? '🔒 [ADMIN]' : '🌐 [PÚBLICO]';
-            console.log(`✅ Comando cargado: !${comando.nombre} ${etiquetaAdmin}`);
-        }
-    }
 }
 
 // Cargar todos los comandos desde la carpeta principal

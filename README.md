@@ -56,6 +56,10 @@ GROQ_API_KEY=tu_api_key_de_groq_aqui
 | `!kat <pregunta>` | ia | ❌ | Conversa con la IA de KAT (Groq / Llama 3.3) |
 | `!embed [Título \| Texto]` | multimedia | ❌ | Crea un mensaje embed. Sin argumentos, muestra la guía |
 | `!clear <cantidad>` | admin | ✅ | Elimina entre 1 y 100 mensajes del canal |
+| `!help [comando]` | utilidad | ❌ | Lista todos los comandos agrupados por categoría, o detalla uno |
+| `!ping` | utilidad | ❌ | Muestra la latencia actual del bot |
+| `!userinfo [@usuario]` | utilidad | ❌ | Info de un usuario (o de quien ejecuta el comando) |
+| `!serverinfo` | utilidad | ❌ | Info general del servidor (miembros, canales, roles, dueño) |
 
 > Los comandos dentro de `comandos/admin/` (o cualquier subcarpeta suya) se marcan automáticamente como `soloAdmin: true`, sin importar lo que digas en el archivo — no hace falta declararlo a mano, aunque es buena práctica dejarlo explícito para que se entienda al leer el código.
 
