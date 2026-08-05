@@ -1,8 +1,11 @@
-const { preguntarIA } = require('../../servicios/groq');
+const { preguntarIA, preguntarIAConHistorial } = require('../../servicios/groq');
+const { esCanalIA } = require('../../servicios/canalesIA');
+const { obtenerHistorial, agregarMensaje } = require('../../utilidades/historialIA');
+const { obtenerNombreUsuario } = require('../../utilidades/cacheUsuarios');
 
 module.exports = {
     nombre: 'kat',
-    descripcion: 'Chatea con la Inteligencia Artificial de KAT',
+    descripcion: 'Chatea con la Inteligencia Artificial de KAT. Con !canalia activado, recuerda la conversación en ese canal.',
     categoria: 'ia',
     soloAdmin: false,
     ejecutar: async (evento, args, responder) => {
@@ -14,7 +17,28 @@ module.exports = {
 
         await responder('💭 *KAT está pensando...*');
 
-        const { texto, error } = await preguntarIA(pregunta);
+        const conMemoria = esCanalIA(evento.channel);
+        let resultado;
+
+        if (conMemoria) {
+            // El canal tiene memoria activada: agregamos la pregunta al historial
+            // (etiquetada con quién la hizo, por si varias personas usan !kat aquí)
+            // y le pasamos toda la conversación reciente, no solo esta pregunta.
+            const nombreUsuario = await obtenerNombreUsuario(evento.author);
+            agregarMensaje(evento.channel, 'user', `${nombreUsuario}: ${pregunta}`);
+
+            const historial = obtenerHistorial(evento.channel);
+            resultado = await preguntarIAConHistorial(historial);
+
+            if (resultado.texto) {
+                agregarMensaje(evento.channel, 'assistant', resultado.texto);
+            }
+        } else {
+            // Sin memoria: comportamiento clásico, pregunta y respuesta aisladas.
+            resultado = await preguntarIA(pregunta);
+        }
+
+        const { texto, error } = resultado;
 
         if (error === 'GROQ_API_KEY_MISSING') {
             return await responder('❌ Error: No se ha configurado la GROQ_API_KEY en el .env');

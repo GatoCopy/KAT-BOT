@@ -200,6 +200,125 @@ async function obtenerMiembro(serverId, userId) {
     return await res.json();
 }
 
+/**
+ * Expulsa (kick) a un miembro del servidor. No es lo mismo que banear:
+ * el usuario puede volver a unirse con una invitación.
+ */
+async function expulsarMiembro(serverId, userId, razon) {
+    try {
+        const headers = { 'x-bot-token': TOKEN };
+        if (razon) headers['X-Audit-Log-Reason'] = razon;
+
+        const res = await fetch(`${API_URL}/servers/${serverId}/members/${userId}`, {
+            method: 'DELETE',
+            headers
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('❌ Error expulsando miembro:', error);
+        return false;
+    }
+}
+
+/**
+ * Banea a un usuario del servidor (kick + no puede volver a entrar con invite).
+ */
+async function banearUsuario(serverId, userId, razon) {
+    try {
+        const headers = {
+            'x-bot-token': TOKEN,
+            'Content-Type': 'application/json'
+        };
+        if (razon) headers['X-Audit-Log-Reason'] = razon;
+
+        const res = await fetch(`${API_URL}/servers/${serverId}/bans/${userId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ reason: razon || undefined })
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('❌ Error baneando usuario:', error);
+        return false;
+    }
+}
+
+/**
+ * Quita el baneo de un usuario.
+ */
+async function desbanearUsuario(serverId, userId, razon) {
+    try {
+        const headers = { 'x-bot-token': TOKEN };
+        if (razon) headers['X-Audit-Log-Reason'] = razon;
+
+        const res = await fetch(`${API_URL}/servers/${serverId}/bans/${userId}`, {
+            method: 'DELETE',
+            headers
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('❌ Error desbaneando usuario:', error);
+        return false;
+    }
+}
+
+/**
+ * Edita un miembro del servidor: apodo, avatar, roles o timeout (suspensión temporal).
+ * `data` sigue el esquema DataMemberEdit de la API de Revolt/Stoat, ej:
+ *   { roles: ['id1', 'id2'] }
+ *   { timeout: '2025-01-01T00:00:00.000Z' }
+ *   { remove: ['Timeout'] }  → para quitar la suspensión
+ */
+async function editarMiembro(serverId, userId, data, razon) {
+    try {
+        const headers = {
+            'x-bot-token': TOKEN,
+            'Content-Type': 'application/json'
+        };
+        if (razon) headers['X-Audit-Log-Reason'] = razon;
+
+        const res = await fetch(`${API_URL}/servers/${serverId}/members/${userId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (error) {
+        console.error('❌ Error editando miembro:', error);
+        return null;
+    }
+}
+
+/**
+ * Hace que el BOT reaccione a un mensaje con un emoji (usado al crear un autorol,
+ * para dejar la reacción lista y que la gente solo tenga que hacer click).
+ * `emoji` es el carácter unicode del emoji, o el ID de un emoji personalizado del server.
+ */
+async function agregarReaccion(channelId, messageId, emoji) {
+    try {
+        const res = await fetch(`${API_URL}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, {
+            method: 'PUT',
+            headers: { 'x-bot-token': TOKEN }
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('❌ Error agregando reacción:', error);
+        return false;
+    }
+}
+
+/**
+ * Lista todos los baneos activos de un servidor. Devuelve { users: [...], bans: [...] }.
+ */
+async function listarBaneos(serverId) {
+    const res = await fetch(`${API_URL}/servers/${serverId}/bans`, {
+        headers: { 'x-bot-token': TOKEN }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+}
+
 module.exports = {
     TOKEN,
     enviarMensaje,
@@ -213,4 +332,10 @@ module.exports = {
     obtenerUsuario,
     obtenerMiembro,
     esAdministrador,
+    expulsarMiembro,
+    banearUsuario,
+    desbanearUsuario,
+    listarBaneos,
+    editarMiembro,
+    agregarReaccion,
 };

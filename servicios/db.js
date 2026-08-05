@@ -43,6 +43,26 @@ db.exec(`
         activado_por TEXT NOT NULL,
         activado_en INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS warns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        servidor_id TEXT NOT NULL,
+        usuario_id TEXT NOT NULL,
+        moderador_id TEXT NOT NULL,
+        razon TEXT,
+        creado_en INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS autoroles (
+        mensaje_id TEXT NOT NULL,
+        emoji_id TEXT NOT NULL,
+        rol_id TEXT NOT NULL,
+        servidor_id TEXT NOT NULL,
+        canal_id TEXT NOT NULL,
+        creado_por TEXT NOT NULL,
+        creado_en INTEGER NOT NULL,
+        PRIMARY KEY (mensaje_id, emoji_id)
+    );
 `);
 
 module.exports = db;

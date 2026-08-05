@@ -1,5 +1,6 @@
 const { obtenerCanal, obtenerUsuario, obtenerMiembro } = require('../../servicios/api');
 const { COLOR_SERVER } = require('../../config/constantes');
+const { limpiarId } = require('../../utilidades/parseMencion');
 
 const PRESENCIA_EMOJI = {
     Online: '🟢 En línea',
@@ -8,15 +9,6 @@ const PRESENCIA_EMOJI = {
     Invisible: '⚪ Invisible',
     Offline: '⚫ Desconectado',
 };
-
-/**
- * Extrae un ID de usuario de un argumento, ya venga como mención "<@ID>" o como ID puro.
- */
-function limpiarId(texto) {
-    if (!texto) return null;
-    const match = texto.match(/^<@([A-Za-z0-9]+)>$/);
-    return match ? match[1] : texto;
-}
 
 module.exports = {
     nombre: 'userinfo',

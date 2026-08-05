@@ -25,12 +25,22 @@ kat-bot/
 │   └── message.js
 │
 ├── servicios/                # Lógica reutilizable (llamadas a APIs externas)
-│   ├── api.js                  # Funciones para hablar con la API de Revolt
+│   ├── api.js                  # Funciones para hablar con la API de Revolt/Stoat
 │   ├── groq.js                 # Función para hablar con la API de Groq (IA)
 │   ├── db.js                   # Conexión y esquema de la base de datos SQLite
 │   ├── recordatorios.js        # Acceso a datos de recordatorios
 │   ├── encuestas.js            # Acceso a datos de encuestas y votos
+│   ├── warns.js                # Acceso a datos de advertencias
+│   ├── autoroles.js            # Acceso a datos de autoroles (reacción → rol)
+│   ├── canalesIA.js            # Activación de memoria de !kat por canal
 │   └── scheduler.js            # Revisa periódicamente recordatorios vencidos
+│
+├── utilidades/
+│   ├── cargadorComandos.js    # Carga los comandos y expone el Map compartido
+│   ├── tiempo.js               # Parsea/formatea duraciones ("10m", "2h30m")
+│   ├── parseMencion.js         # Extrae un ID de una mención "<@ID>" o texto plano
+│   ├── historialIA.js          # Historial de conversación en memoria, por canal
+│   └── cacheUsuarios.js        # Cache de nombres de usuario (evita pedirlos siempre)
 │
 ├── data/
 │   └── kat.db                # Base de datos SQLite (se crea sola, NO subir a git)
@@ -61,10 +71,21 @@ GROQ_API_KEY=tu_api_key_de_groq_aqui
 | `!chiste` | diversión | ❌ | Cuenta un chiste aleatorio |
 | `!bola8 <pregunta>` | diversión | ❌ | Responde preguntas al estilo bola 8 mágica |
 | `!kat <pregunta>` | ia | ❌ | Conversa con la IA de KAT (Groq / Llama 3.3) |
-| `!canalia [on\|off]` | ia | ✅ | Activa/desactiva que KAT responda a todo (sin `!kat`) en el canal |
+| `!canalia [on\|off]` | ia | ✅ | Activa/desactiva que `!kat` recuerde la conversación en este canal |
 | `!embed [Título \| Texto]` | multimedia | ❌ | Crea un mensaje embed. Sin argumentos, muestra la guía |
 | `!clear <cantidad>` | admin | ✅ | Elimina entre 1 y 100 mensajes del canal |
-| `!help [comando]` | utilidad | ❌ | Lista todos los comandos agrupados por categoría, o detalla uno |
+| `!kick <@usuario> [razón]` | admin | ✅ | Expulsa a un miembro (puede volver a unirse con invitación) |
+| `!ban <@usuario> [razón]` | admin | ✅ | Banea a un usuario |
+| `!unban <ID>` | admin | ✅ | Quita el baneo a un usuario |
+| `!banlist` | admin | ✅ | Lista los usuarios baneados del servidor |
+| `!suspender <@usuario> <tiempo> [razón]` | admin | ✅ | Suspende temporalmente a un miembro (timeout) |
+| `!desuspender <@usuario>` | admin | ✅ | Quita la suspensión temporal |
+| `!warn <@usuario> [razón]` | admin | ✅ | Agrega una advertencia a un usuario |
+| `!warns <@usuario>` | admin | ✅ | Lista las advertencias de un usuario |
+| `!delwarn <id>` | admin | ✅ | Elimina una advertencia específica |
+| `!decir [ID canal] <mensaje>` | admin | ✅ | El bot envía un mensaje por ti (anuncios) |
+| `!autorol crear\|quitar\|lista` | admin | ✅ | Configura roles automáticos por reacción |
+| `!help [categoría\|comando]` | utilidad | ❌ | Menú de categorías, comandos de una categoría, o detalle de uno |
 | `!ping` | utilidad | ❌ | Muestra la latencia actual del bot |
 | `!userinfo [@usuario]` | utilidad | ❌ | Info de un usuario (o de quien ejecuta el comando) |
 | `!serverinfo` | utilidad | ❌ | Info general del servidor (miembros, canales, roles, dueño) |
@@ -100,7 +121,7 @@ module.exports = {
 };
 ```
 
-3. Guarda el archivo. **No hay que tocar `index.js` ni ningún otro archivo** — el loader recorre `comandos/` de forma recursiva y lo detecta solo la próxima vez que reinicies el bot (`pm2 restart KAT` o `node index.js`).
+3. Guarda el archivo. **No hay que tocar `index.js`, `help.js`, ni ningún otro archivo** — el loader recorre `comandos/` de forma recursiva y lo detecta solo la próxima vez que reinicies el bot (`pm2 restart KAT` o `node index.js`). `!help` también se actualiza solo: agrupa por el campo `categoria` que pongas en cada comando, así que si usas una categoría que ya existe (`admin`, `diversion`, `ia`, `multimedia`, `utilidad`) aparece ahí mismo; si inventas una categoría nueva (ej. `categoria: 'musica'`), también aparece automáticamente en `!help`, solo que sin un emoji bonito asignado — para eso, opcionalmente puedes agregar una línea en `NOMBRES_CATEGORIA` dentro de `comandos/utilidad/help.js`, pero no es obligatorio.
 
 ### Si tu comando necesita hablar con una API externa
 
@@ -158,6 +179,28 @@ Para reiniciar tras cambios (nuevos comandos, edición de `.env`, etc.):
 pm2 restart KAT
 ```
 
+## 🛡️ Moderación
+
+Todos los comandos de moderación viven en `comandos/admin/`, así que el loader los marca como solo-admin automáticamente.
+
+**Antes de usarlos:** el bot necesita los permisos correspondientes en el rol que le diste dentro del servidor — `KickMembers` para `!kick`, `BanMembers` para `!ban`/`!unban`/`!banlist`, `TimeoutMembers` para `!suspender`/`!desuspender`, `AssignRoles` para `!autorol`, y `React` para que pueda poner la reacción inicial en los autoroles. Si un comando falla con un mensaje genérico de "no pude hacer X", lo primero a revisar es si al bot le falta ese permiso.
+
+**Warns:** son solo un registro (no hacen nada automáticamente). A partir de 3 advertencias, `!warn` te avisa en el propio mensaje para que decidas si aplicar una suspensión o expulsión — no hay expulsión automática, a propósito, para que la decisión la siga tomando un humano.
+
+### Configurar un autorol paso a paso
+
+1. Activa el "modo desarrollador" en tu cliente de Stoat (Configuración → Avanzado) para poder copiar IDs con click derecho.
+2. Envía (o ubica) el mensaje que quieres usar como panel de roles, por ejemplo: "Reacciona con 🎮 para el rol de Gamer".
+3. Click derecho sobre ese mensaje → Copiar ID.
+4. Ve a Configuración del servidor → Roles, y copia el ID del rol que quieres asignar.
+5. En el **mismo canal** donde está el mensaje, ejecuta:
+   ```
+   !autorol crear <ID_del_mensaje> 🎮 <ID_del_rol>
+   ```
+6. El bot reacciona solo al mensaje con ese emoji. Cualquiera que reaccione ahí recibe el rol; si quita la reacción, se lo quita.
+
+Puedes tener varios autoroles en el mismo mensaje (uno por cada emoji distinto). `!autorol lista` te muestra todos los configurados en el servidor, y `!autorol quitar <ID_mensaje> <emoji>` elimina uno.
+
 ---
 
 ## 💾 Persistencia (recordatorios y encuestas)
@@ -170,12 +213,13 @@ Estos datos se guardan en `data/kat.db` (SQLite, vía `better-sqlite3`), así qu
 
 ---
 
-## 💬 Modo conversación (canal IA)
+## 💬 Memoria de conversación en !kat (canal IA)
 
-Con `!canalia on` (solo admins), el canal donde lo ejecutes deja de necesitar el prefijo `!kat` — KAT responde a **todo** lo que se escriba ahí, manteniendo el hilo de la conversación (últimos ~10 intercambios). Los comandos con `!` siguen funcionando normal en ese mismo canal.
+Con `!canalia on` (solo admins), el canal donde lo ejecutes activa la **memoria** para `!kat`: cada vez que alguien use `!kat <pregunta>` en ese canal, la IA recuerda hasta las últimas **20 peticiones** (pregunta + respuesta) de la conversación, en vez de tratar cada pregunta de forma aislada como hace por defecto en cualquier otro canal.
+
+**Importante — sigue siendo por comando, no automático:** `!kat` sigue siendo obligatorio para que responda. `!canalia on` NO hace que responda a todo lo que se escriba sin prefijo — eso se probó y resultó ser demasiado (respondía a cada mensaje suelto del canal, con el riesgo de disparar la API de Groq constantemente). Ahora es memoria opcional, activación explícita por mensaje.
 
 **Cosas a tener en cuenta:**
-- ⚠️ **Cada mensaje sin prefijo en ese canal dispara una llamada a la API de Groq.** En un canal activo, esto puede consumir tu cuota rápido — revisa tus límites en el dashboard de Groq.
-- El historial es **compartido entre todos los que escriban en el canal** (como una conversación grupal con KAT), no uno privado por persona. Cada mensaje se etiqueta con el nombre de quien lo escribió para que la IA distinga quién dice qué.
-- El on/off queda guardado en `data/kat.db` (sobrevive reinicios). El historial de la conversación en sí vive en memoria (`utilidades/historialIA.js`) y se pierde si el bot se reinicia, o si apagas/prendes el modo con `!canalia off` / `!canalia on`.
-- Si `!kat` responde bien pero el canal en modo conversación no dice nada, revisa los logs del bot (`pm2 logs KAT`) — los errores de la IA en este modo no se muestran en el chat a propósito, para no spamear el canal si algo como la API key falla.
+- La memoria es **compartida entre todos los que usen `!kat` en ese canal** (como una conversación grupal), no privada por persona. Cada pregunta se etiqueta con el nombre de quien la hizo para que la IA distinga quién dice qué.
+- El on/off queda guardado en `data/kat.db` (sobrevive reinicios). La conversación en sí vive en memoria (`utilidades/historialIA.js`) y se pierde si el bot se reinicia, o si apagas/prendes la memoria con `!canalia off` / `!canalia on`.
+- Al llegar a 20 peticiones guardadas, la más antigua se descarta para dar espacio a la nueva (FIFO) — conversaciones muy largas van a "olvidar" lo de más atrás, a propósito, para no disparar el tamaño/costo de cada llamada a Groq.
