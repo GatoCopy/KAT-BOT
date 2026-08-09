@@ -1,9 +1,8 @@
 const eventos = new Map();
 
-eventos.set('Authenticated', require('./authenticated'));
-eventos.set('Ready', require('./ready'));
-eventos.set('Message', require('./message'));
-eventos.set('MessageReact', require('./messageReact'));
-eventos.set('MessageUnreact', require('./messageUnreact'));
+eventos.set('clientReady', require('./ready'));
+eventos.set('messageCreate', require('./message'));
+eventos.set('messageReactionAdd', require('./messageReact'));
+eventos.set('messageReactionRemove', require('./messageUnreact'));
 
 module.exports = eventos;

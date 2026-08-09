@@ -1,19 +1,25 @@
 const { obtenerAutorol } = require('../servicios/autoroles');
 const { obtenerMiembro, editarMiembro } = require('../servicios/api');
 
-module.exports = async function manejarMessageUnreact(evento, ctx) {
-    if (ctx.getBotId() && evento.user_id === ctx.getBotId()) return;
+module.exports = async function manejarMessageUnreact(reaction, user) {
+    if (user.bot) return;
 
-    const autorol = obtenerAutorol(evento.id, evento.emoji_id);
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+
+    const emojiId = reaction.emoji.id || reaction.emoji.name;
+
+    const autorol = obtenerAutorol(reaction.message.id, emojiId);
     if (!autorol) return;
 
-    const miembro = await obtenerMiembro(autorol.servidor_id, evento.user_id);
+    const miembro = await obtenerMiembro(autorol.servidor_id, user.id);
     if (!miembro) return;
 
     const rolesActuales = miembro.roles || [];
-    if (!rolesActuales.includes(autorol.rol_id)) return; // ya no lo tenía
+    if (!rolesActuales.includes(autorol.rol_id)) return;
 
-    await editarMiembro(autorol.servidor_id, evento.user_id, {
+    await editarMiembro(autorol.servidor_id, user.id, {
         roles: rolesActuales.filter(r => r !== autorol.rol_id)
     });
 };

@@ -1,5 +1,6 @@
-const { obtenerCanal, expulsarMiembro } = require('../../servicios/api');
-const { limpiarId } = require('../../utilidades/parseMencion');
+const { obtenerCanal, expulsarMiembro } = require('../../../servicios/api');
+const { registrarAccion } = require('../../../servicios/logs');
+const { limpiarId } = require('../../../utilidades/parseMencion');
 
 module.exports = {
     nombre: 'kick',
@@ -25,8 +26,11 @@ module.exports = {
             return await responder('❌ No pude expulsar a ese usuario. Verifica el ID/mención y que el bot tenga permiso `KickMembers`.');
         }
 
-        await responder(
-            `👢 Usuario expulsado.${razon ? `\n**Razón:** ${razon}` : ''}`
-        );
+        await registrarAccion(canal.server, {
+            titulo: '👢 Expulsión',
+            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Razón:** ${razon || 'Sin razón especificada'}`
+        });
+
+        await responder(`👢 Usuario expulsado.${razon ? `\n**Razón:** ${razon}` : ''}`);
     }
 };

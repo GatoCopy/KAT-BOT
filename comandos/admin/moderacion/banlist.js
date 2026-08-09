@@ -1,5 +1,5 @@
-const { obtenerCanal, listarBaneos } = require('../../servicios/api');
-const { COLOR_SERVER } = require('../../config/constantes');
+const { obtenerCanal, listarBaneos } = require('../../../servicios/api');
+const { COLOR_SERVER } = require('../../../config/constantes');
 
 module.exports = {
     nombre: 'banlist',

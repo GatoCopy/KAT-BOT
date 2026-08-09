@@ -1,5 +1,6 @@
-const { obtenerCanal } = require('../../servicios/api');
-const { eliminarWarn } = require('../../servicios/warns');
+const { obtenerCanal } = require('../../../servicios/api');
+const { eliminarWarn } = require('../../../servicios/warns');
+const { registrarAccion } = require('../../../servicios/logs');
 
 module.exports = {
     nombre: 'delwarn',
@@ -22,6 +23,11 @@ module.exports = {
         if (!eliminado) {
             return await responder(`❌ No encontré el warn #${id} en este servidor.`);
         }
+
+        await registrarAccion(canal.server, {
+            titulo: '🗑️ Warn eliminado',
+            descripcion: `**Warn:** #${id}\n**Moderador:** <@${evento.author}>`
+        });
 
         await responder(`✅ Warn #${id} eliminado.`);
     }

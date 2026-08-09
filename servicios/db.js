@@ -63,6 +63,33 @@ db.exec(`
         creado_en INTEGER NOT NULL,
         PRIMARY KEY (mensaje_id, emoji_id)
     );
+
+    CREATE TABLE IF NOT EXISTS logs_moderacion (
+        servidor_id TEXT PRIMARY KEY,
+        canal_id TEXT NOT NULL,
+        activado_por TEXT NOT NULL,
+        activado_en INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS automod_config (
+        servidor_id TEXT PRIMARY KEY,
+        antiflood_activado INTEGER NOT NULL DEFAULT 0,
+        filtro_palabras_activado INTEGER NOT NULL DEFAULT 0,
+        filtro_links_activado INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS palabras_prohibidas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        servidor_id TEXT NOT NULL,
+        palabra TEXT NOT NULL,
+        UNIQUE(servidor_id, palabra)
+    );
+
+    CREATE TABLE IF NOT EXISTS canales_links_permitidos (
+        servidor_id TEXT NOT NULL,
+        canal_id TEXT NOT NULL,
+        PRIMARY KEY (servidor_id, canal_id)
+    );
 `);
 
 module.exports = db;

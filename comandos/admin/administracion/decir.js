@@ -1,7 +1,7 @@
-const { enviarMensaje, eliminarMensaje } = require('../../servicios/api');
+const { enviarMensaje, eliminarMensaje } = require('../../../servicios/api');
 
-// IDs de Revolt/Stoat son ULIDs de 26 caracteres alfanuméricos
-const REGEX_ID = /^[0-9A-Za-z]{26}$/;
+// IDs de Discord son "snowflakes": números de 17 a 20 dígitos
+const REGEX_ID = /^\d{17,20}$/;
 
 module.exports = {
     nombre: 'decir',

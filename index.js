@@ -1,73 +1,41 @@
-const WebSocket = require('ws');
-const path = require('path');
 require('dotenv').config();
+const path = require('path');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 
-const { WS_URL, PING_INTERVAL_MS, RECONEXION_MS } = require('./config/constantes');
+const { setClient } = require('./servicios/discordClient');
 const { TOKEN } = require('./servicios/api');
-const { commands, cargarComandos } = require('./utilidades/cargadorComandos');
+const { cargarComandos } = require('./utilidades/cargadorComandos');
 const { iniciarSchedulerRecordatorios } = require('./servicios/scheduler');
 const eventos = require('./eventos');
 
 if (!TOKEN) {
-    console.error('❌ Error: No se encontró BOT_TOKEN o TOKEN en el archivo .env');
+    console.error('❌ Error: No se encontró DISCORD_TOKEN (o BOT_TOKEN/TOKEN) en el archivo .env');
     process.exit(1);
 }
 
 // Cargar todos los comandos desde la carpeta principal
 cargarComandos(path.join(__dirname, 'comandos'));
 
-// El scheduler corre independiente del WebSocket: usa la API REST directamente,
-// así que sigue revisando recordatorios incluso si el WS se está reconectando.
-iniciarSchedulerRecordatorios();
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,          // necesario para leer texto de comandos con !prefijo
+        GatewayIntentBits.GuildMembers,             // necesario para kick/ban/roles/autoroles
+        GatewayIntentBits.GuildMessageReactions,    // necesario para autoroles por reacción
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+});
 
-function conectarBot() {
-    const ws = new WebSocket(WS_URL);
-    let miBotId = null;
-    let pingInterval = null;
+setClient(client);
 
-    // Contexto compartido que se pasa a cada handler de evento
-    const ctx = {
-        commands,
-        getBotId: () => miBotId,
-        setBotId: (id) => { miBotId = id; },
-    };
-
-    ws.on('open', () => {
-        console.log('🔗 Conectando WebSocket a Stoat...');
-        ws.send(JSON.stringify({
-            type: 'Authenticate',
-            token: TOKEN
-        }));
-
-        // Mantener la conexión con un Ping de vida
-        pingInterval = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'Ping', data: Date.now() }));
-            }
-        }, PING_INTERVAL_MS);
-    });
-
-    ws.on('message', async (data) => {
-        try {
-            const evento = JSON.parse(data);
-            const handler = eventos.get(evento.type);
-            if (handler) {
-                await handler(evento, ctx);
-            }
-        } catch (e) {
-            console.error('⚠️ Error procesando evento:', e);
-        }
-    });
-
-    ws.on('close', () => {
-        console.log(`⚠️ Conexión cerrada. Reintentando en ${RECONEXION_MS / 1000} segundos...`);
-        clearInterval(pingInterval);
-        setTimeout(conectarBot, RECONEXION_MS);
-    });
-
-    ws.on('error', (err) => {
-        console.error('❌ Error en WebSocket:', err.message);
-    });
+for (const [nombreEvento, handler] of eventos.entries()) {
+    client.on(nombreEvento, handler);
 }
 
-conectarBot();
+// El scheduler de recordatorios corre independiente de discord.js — usa la
+// API REST directamente, así que sigue funcionando aunque el gateway se
+// esté reconectando.
+iniciarSchedulerRecordatorios();
+
+client.login(TOKEN);

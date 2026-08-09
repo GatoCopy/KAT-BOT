@@ -1,7 +1,7 @@
-const { obtenerCanal } = require('../../servicios/api');
-const { obtenerWarns } = require('../../servicios/warns');
-const { limpiarId } = require('../../utilidades/parseMencion');
-const { COLOR_SERVER } = require('../../config/constantes');
+const { obtenerCanal } = require('../../../servicios/api');
+const { obtenerWarns } = require('../../../servicios/warns');
+const { limpiarId } = require('../../../utilidades/parseMencion');
+const { COLOR_SERVER } = require('../../../config/constantes');
 
 module.exports = {
     nombre: 'warns',

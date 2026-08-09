@@ -1,6 +1,7 @@
-const { obtenerCanal } = require('../../servicios/api');
-const { crearWarn, contarWarns } = require('../../servicios/warns');
-const { limpiarId } = require('../../utilidades/parseMencion');
+const { obtenerCanal } = require('../../../servicios/api');
+const { crearWarn, contarWarns } = require('../../../servicios/warns');
+const { registrarAccion } = require('../../../servicios/logs');
+const { limpiarId } = require('../../../utilidades/parseMencion');
 
 const UMBRAL_AVISO = 3; // a partir de cuántos warns se avisa al moderador para que considere acción
 
@@ -31,6 +32,11 @@ module.exports = {
         });
 
         const total = contarWarns(canal.server, idObjetivo);
+
+        await registrarAccion(canal.server, {
+            titulo: '⚠️ Advertencia',
+            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Total de warns:** ${total}\n**Razón:** ${razon || 'Sin razón especificada'}`
+        });
 
         let mensaje = `⚠️ Usuario advertido. Lleva **${total}** warn(s) en este servidor.${razon ? `\n**Razón:** ${razon}` : ''}`;
         if (total >= UMBRAL_AVISO) {

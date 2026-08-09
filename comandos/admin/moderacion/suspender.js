@@ -1,6 +1,7 @@
-const { obtenerCanal, editarMiembro } = require('../../servicios/api');
-const { limpiarId } = require('../../utilidades/parseMencion');
-const { parsearDuracion, formatearDuracion } = require('../../utilidades/tiempo');
+const { obtenerCanal, editarMiembro } = require('../../../servicios/api');
+const { registrarAccion } = require('../../../servicios/logs');
+const { limpiarId } = require('../../../utilidades/parseMencion');
+const { parsearDuracion, formatearDuracion } = require('../../../utilidades/tiempo');
 
 module.exports = {
     nombre: 'suspender',
@@ -33,6 +34,11 @@ module.exports = {
         if (!resultado) {
             return await responder('❌ No pude suspender a ese usuario. Verifica el ID/mención y que el bot tenga permiso `TimeoutMembers`.');
         }
+
+        await registrarAccion(canal.server, {
+            titulo: '🔇 Suspensión',
+            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Duración:** ${formatearDuracion(duracionMs)}\n**Razón:** ${razon || 'Sin razón especificada'}`
+        });
 
         await responder(
             `🔇 Usuario suspendido por **${formatearDuracion(duracionMs)}**.${razon ? `\n**Razón:** ${razon}` : ''}`

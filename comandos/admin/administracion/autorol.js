@@ -1,6 +1,6 @@
-const { obtenerCanal, agregarReaccion } = require('../../servicios/api');
-const { crearAutorol, eliminarAutorol, listarAutorolesServidor } = require('../../servicios/autoroles');
-const { COLOR_SERVER } = require('../../config/constantes');
+const { obtenerCanal, agregarReaccion } = require('../../../servicios/api');
+const { crearAutorol, eliminarAutorol, listarAutorolesServidor } = require('../../../servicios/autoroles');
+const { COLOR_SERVER } = require('../../../config/constantes');
 
 module.exports = {
     nombre: 'autorol',

@@ -1,5 +1,6 @@
-const { obtenerCanal, desbanearUsuario } = require('../../servicios/api');
-const { limpiarId } = require('../../utilidades/parseMencion');
+const { obtenerCanal, desbanearUsuario } = require('../../../servicios/api');
+const { registrarAccion } = require('../../../servicios/logs');
+const { limpiarId } = require('../../../utilidades/parseMencion');
 
 module.exports = {
     nombre: 'unban',
@@ -10,7 +11,7 @@ module.exports = {
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
         if (!idObjetivo) {
-            return await responder('⚠️ **Uso:** `!unban <ID de usuario>`\n*(No puedes mencionar a alguien baneado, necesitas su ID — revísalo con `!banlist` o desde el panel del servidor.)*');
+            return await responder('⚠️ **Uso:** `!unban <ID de usuario>`\n*(No puedes mencionar a alguien baneado, necesitas su ID — revísalo con `!banlist`.)*');
         }
 
         const canal = await obtenerCanal(evento.channel);
@@ -22,6 +23,11 @@ module.exports = {
         if (!exito) {
             return await responder('❌ No pude quitar el baneo. Verifica el ID y que el bot tenga permiso `BanMembers`.');
         }
+
+        await registrarAccion(canal.server, {
+            titulo: '✅ Baneo removido',
+            descripcion: `**Usuario:** \`${idObjetivo}\`\n**Moderador:** <@${evento.author}>`
+        });
 
         await responder('✅ Baneo removido.');
     }

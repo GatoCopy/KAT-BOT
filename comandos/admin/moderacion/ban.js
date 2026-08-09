@@ -1,5 +1,6 @@
-const { obtenerCanal, banearUsuario } = require('../../servicios/api');
-const { limpiarId } = require('../../utilidades/parseMencion');
+const { obtenerCanal, banearUsuario } = require('../../../servicios/api');
+const { registrarAccion } = require('../../../servicios/logs');
+const { limpiarId } = require('../../../utilidades/parseMencion');
 
 module.exports = {
     nombre: 'ban',
@@ -25,8 +26,11 @@ module.exports = {
             return await responder('❌ No pude banear a ese usuario. Verifica el ID/mención y que el bot tenga permiso `BanMembers`.');
         }
 
-        await responder(
-            `🔨 Usuario baneado.${razon ? `\n**Razón:** ${razon}` : ''}`
-        );
+        await registrarAccion(canal.server, {
+            titulo: '🔨 Baneo',
+            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Razón:** ${razon || 'Sin razón especificada'}`
+        });
+
+        await responder(`🔨 Usuario baneado.${razon ? `\n**Razón:** ${razon}` : ''}`);
     }
 };

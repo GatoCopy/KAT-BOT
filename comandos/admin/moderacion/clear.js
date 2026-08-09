@@ -1,4 +1,4 @@
-const { enviarMensaje, obtenerMensajes, eliminarMensajesEnBloque, eliminarMensaje } = require('../../servicios/api');
+const { enviarMensaje, obtenerMensajes, eliminarMensajesEnBloque, eliminarMensaje } = require('../../../servicios/api');
 
 module.exports = {
     nombre: 'clear',

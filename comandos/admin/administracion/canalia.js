@@ -1,5 +1,5 @@
-const { activarCanal, desactivarCanal, esCanalIA } = require('../../servicios/canalesIA');
-const { limpiarHistorial } = require('../../utilidades/historialIA');
+const { activarCanal, desactivarCanal, esCanalIA } = require('../../../servicios/canalesIA');
+const { limpiarHistorial } = require('../../../utilidades/historialIA');
 
 module.exports = {
     nombre: 'canalia',

@@ -1,5 +1,6 @@
-const { obtenerCanal, editarMiembro } = require('../../servicios/api');
-const { limpiarId } = require('../../utilidades/parseMencion');
+const { obtenerCanal, editarMiembro } = require('../../../servicios/api');
+const { registrarAccion } = require('../../../servicios/logs');
+const { limpiarId } = require('../../../utilidades/parseMencion');
 
 module.exports = {
     nombre: 'desuspender',
@@ -22,6 +23,11 @@ module.exports = {
         if (!resultado) {
             return await responder('❌ No pude quitar la suspensión. Verifica el ID/mención.');
         }
+
+        await registrarAccion(canal.server, {
+            titulo: '🔊 Suspensión removida',
+            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>`
+        });
 
         await responder('🔊 Suspensión removida.');
     }
