@@ -1,6 +1,6 @@
 # 🐱 KAT — Bot multipropósito para Discord
 
-KAT es un bot modular para servidores de Discord, con comandos de moderación, ocio, multimedia e integración con IA (Groq). Desarrollado por **Alexander Jerrard (CopyCat)**. Migrado de Stoat/Revolt.chat a Discord — la mayoría de la lógica interna es idéntica, solo cambió la capa que habla con la plataforma (servicios/api.js, discord.js en vez de WebSocket manual).
+KAT es un bot modular para servidores de Discord, con comandos de moderación, ocio, multimedia e integración con IA (Groq). Desarrollado por **Alexander Jerrard (CopyCat)**.
 
 ---
 
@@ -98,6 +98,10 @@ GROQ_API_KEY=tu_api_key_de_groq_aqui
 | `!antiflood [on\|off]` | admin | ✅ | Auto-suspende a quien mande mensajes muy seguidos |
 | `!filtrolinks [on\|off]` | admin | ✅ | Bloquea links fuera de canales permitidos |
 | `!linkscanal permitir\|quitar\|lista` | admin | ✅ | Administra qué canales permiten links |
+| `!setrol moderador\|administrador\|ver` | admin | ✅ | Configura qué rol cuenta como moderador/administrador |
+| `!historial <@usuario>` | admin | ✅ | Junta todas las acciones de moderación de un usuario |
+| `!infokat set\|ver\|borrar` | admin | ✅ | Define reglas/info que `!kat` debe conocer del servidor |
+| `!gato` | multimedia | ❌ | Imagen aleatoria de un gato |
 | `!help [categoría\|comando]` | utilidad | ❌ | Menú de categorías, comandos de una categoría, o detalle de uno |
 | `!ping` | utilidad | ❌ | Muestra la latencia actual del bot |
 | `!userinfo [@usuario]` | utilidad | ❌ | Info de un usuario (o de quien ejecuta el comando) |
@@ -201,9 +205,11 @@ pm2 restart KAT
 
 ## 🛡️ Moderación
 
-Todos los comandos de moderación viven en `comandos/admin/`, así que el loader los marca como solo-admin automáticamente.
+⚠️ **Primer paso obligatorio en cada servidor nuevo:** ejecuta `!setrol administrador <ID o mención de un rol>` (como dueño del servidor, que siempre tiene acceso). Sin esto, **nadie más que el dueño puede usar ningún comando de moderación o administración**.
 
-**Antes de usarlos:** el bot necesita los permisos correspondientes activados en su rol dentro del servidor — **Kick Members** para `!kick`, **Ban Members** para `!ban`/`!unban`/`!banlist`, **Timeout Members** (Moderate Members) para `!suspender`/`!desuspender`, **Manage Roles** para `!autorol`, y **Add Reactions** para que pueda poner la reacción inicial en los autoroles. El rol del bot también debe estar **por encima**, en la lista de roles del servidor, de cualquier rol que quiera asignar/quitar o de cualquier miembro que quiera moderar — si no, Discord rechaza la acción aunque el permiso esté activado. Si un comando falla con un mensaje genérico de "no pude hacer X", esto (permiso faltante o jerarquía de roles) es lo primero a revisar.
+Todos los comandos de moderación viven en `comandos/admin/`, así que el loader los marca con el nivel correcto automáticamente según la subcarpeta (`moderacion/` o `administracion/`).
+
+**Antes de usarlos:** el bot necesita los permisos correspondientes activados en su rol dentro del servidor — **Kick Members** para `!kick`, **Ban Members** para `!ban`/`!unban`/`!banlist`, **Timeout Members** (Moderate Members) para `!suspender`/`!desuspender`, **Manage Roles** para `!autorol`, **Manage Server** para el rastreo de invitaciones, y **Add Reactions** para que pueda poner la reacción inicial en los autoroles. El rol del bot también debe estar **por encima**, en la lista de roles del servidor, de cualquier rol que quiera asignar/quitar o de cualquier miembro que quiera moderar. Si un comando falla con un mensaje genérico de "no pude hacer X", esto es lo primero a revisar.
 
 **Warns:** son solo un registro (no hacen nada automáticamente). A partir de 3 advertencias, `!warn` te avisa en el propio mensaje para que decidas si aplicar una suspensión o expulsión — no hay expulsión automática, a propósito, para que la decisión la siga tomando un humano.
 
@@ -220,6 +226,19 @@ Todos los comandos de moderación viven en `comandos/admin/`, así que el loader
 6. El bot reacciona solo al mensaje con ese emoji. Cualquiera que reaccione ahí recibe el rol; si quita la reacción, se lo quita.
 
 Puedes tener varios autoroles en el mismo mensaje (uno por cada emoji distinto). `!autorol lista` te muestra todos los configurados en el servidor, y `!autorol quitar <ID_mensaje> <emoji>` elimina uno.
+
+---
+
+## 🧠 KAT y el contexto del servidor
+
+Con `!infokat set <texto>`, los admins le dan a `!kat` información de fondo sobre el servidor (reglas, de qué trata la comunidad, lo que sea útil). A partir de ahí, **cada** llamada a `!kat` (con o sin `!canalia` activado) incluye automáticamente:
+
+- El texto que configuraste con `!infokat`.
+- Quiénes son los administradores y moderadores **ahora mismo**, según lo configurado con `!setrol` (se calcula en vivo, no es una lista fija que se desactualice).
+
+Así, si alguien pregunta "¿cuáles son las reglas de este server?" o "¿quién es admin aquí?", KAT puede responder de verdad en vez de decir que no sabe de qué se le habla. Esto es **contexto de fondo, no de la conversación** — no incluye nada de lo que la gente esté hablando ni quién dijo qué, solo la info base del servidor.
+
+Por rendimiento, esto se cachea 5 minutos (`utilidades/cacheContextoServidor.js`) — cambios vía `!infokat` o `!setrol` invalidan la caché al instante, así que no hay que esperar.
 
 ---
 
@@ -241,7 +260,7 @@ Tres sistemas independientes, cada uno con su propio on/off por servidor — pue
 
 **Los administradores están exentos de los tres sistemas** — así puedes probarlos y seguir usando el bot con normalidad mientras están activos.
 
-**ℹ️ Sobre invitaciones:** en Stoat/Revolt esto era imposible de construir (la API no daba contador de usos). En Discord **sí es viable** — el objeto de invitación trae `uses`, así que se puede rastrear quién entró por cuál invitación comparando conteos antes/después de un join. No está construido todavía; es candidato para una futura mejora.
+**ℹ️ Sobre invitaciones:** en Discord sí es viable — el objeto de invitación trae `uses`, así que se rastrea quién entró por cuál invitación comparando conteos antes/después de un join. Ya está construido (`servicios/invites.js` + `eventos/memberAdd.js`) y se registra automáticamente en `!historial` de cada usuario. Requiere el permiso **Manage Server** en el bot; si falta, simplemente registra "no se pudo determinar" en vez de fallar.
 
 ---
 
@@ -255,9 +274,9 @@ Estos datos se guardan en `data/kat.db` (SQLite, vía `better-sqlite3`), así qu
 
 ---
 
-## 📌 Pendiente (pausado para la migración a Discord)
+## 📌 Historial del proyecto
 
-Estaba en construcción un sistema de **dos niveles de permisos** (moderador vs. administrador, con roles configurables vía `!setrol`) más un comando `!historial` que junta todas las acciones de moderación de un usuario en un solo lugar. Se pausó a medio camino cuando cambiamos de plataforma — lo único que alcanzó a pasar fue mover los comandos existentes a `comandos/admin/moderacion/` y `comandos/admin/administracion/` (la separación de carpetas ya está lista, el sistema de roles detrás todavía no). Mientras tanto, el chequeo de permisos usa los permisos nativos de Discord (`KickMembers`/`BanMembers`/`Administrator`) vía `servicios/api.js` → `esAdministrador()`.
+Este bot empezó en Stoat/Revolt y se migró a Discord. El sistema de **dos niveles de permisos** (moderador vs. administrador, configurable con `!setrol`) y el comando `!historial` (que ahora también incluye el rastreo de invitaciones) están completos y funcionando.
 
 ---
 

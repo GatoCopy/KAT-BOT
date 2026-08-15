@@ -1,10 +1,10 @@
 /**
- * Extrae un ID de un argumento, ya venga como mención "<@ID>" o "<@!ID>"
- * (Discord usa el segundo formato para menciones con apodo), o como ID puro.
+ * Extrae un ID de un argumento, ya venga como mención de usuario "<@ID>" o
+ * "<@!ID>" (apodo), mención de rol "<@&ID>", o como ID puro.
  */
 function limpiarId(texto) {
     if (!texto) return null;
-    const match = texto.match(/^<@!?(\d+)>$/);
+    const match = texto.match(/^<@[!&]?(\d+)>$/);
     return match ? match[1] : texto;
 }
 

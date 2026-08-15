@@ -5,8 +5,7 @@ const { limpiarId } = require('../../../utilidades/parseMencion');
 module.exports = {
     nombre: 'kick',
     descripcion: 'Expulsa a un miembro del servidor (puede volver a unirse con invitación)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
@@ -26,9 +25,12 @@ module.exports = {
             return await responder('❌ No pude expulsar a ese usuario. Verifica el ID/mención y que el bot tenga permiso `KickMembers`.');
         }
 
-        await registrarAccion(canal.server, {
-            titulo: '👢 Expulsión',
-            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Razón:** ${razon || 'Sin razón especificada'}`
+        await registrarAccion({
+            servidorId: canal.server,
+            tipo: 'kick',
+            usuarioId: idObjetivo,
+            moderadorId: evento.author,
+            detalle: `**Razón:** ${razon || 'Sin razón especificada'}`
         });
 
         await responder(`👢 Usuario expulsado.${razon ? `\n**Razón:** ${razon}` : ''}`);

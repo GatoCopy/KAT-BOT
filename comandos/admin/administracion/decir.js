@@ -6,8 +6,7 @@ const REGEX_ID = /^\d{17,20}$/;
 module.exports = {
     nombre: 'decir',
     descripcion: 'El bot envía un mensaje por ti. Útil para anuncios. Uso: !decir [ID de canal] <mensaje>',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         if (!args.length) {

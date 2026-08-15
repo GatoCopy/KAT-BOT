@@ -5,8 +5,7 @@ const { limpiarId } = require('../../../utilidades/parseMencion');
 module.exports = {
     nombre: 'desuspender',
     descripcion: 'Quita la suspensión temporal a un miembro',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
@@ -24,9 +23,11 @@ module.exports = {
             return await responder('❌ No pude quitar la suspensión. Verifica el ID/mención.');
         }
 
-        await registrarAccion(canal.server, {
-            titulo: '🔊 Suspensión removida',
-            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>`
+        await registrarAccion({
+            servidorId: canal.server,
+            tipo: 'desuspension',
+            usuarioId: idObjetivo,
+            moderadorId: evento.author,
         });
 
         await responder('🔊 Suspensión removida.');

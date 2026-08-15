@@ -5,8 +5,7 @@ const { limpiarId } = require('../../../utilidades/parseMencion');
 module.exports = {
     nombre: 'unban',
     descripcion: 'Quita el baneo a un usuario por su ID',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
@@ -24,9 +23,11 @@ module.exports = {
             return await responder('❌ No pude quitar el baneo. Verifica el ID y que el bot tenga permiso `BanMembers`.');
         }
 
-        await registrarAccion(canal.server, {
-            titulo: '✅ Baneo removido',
-            descripcion: `**Usuario:** \`${idObjetivo}\`\n**Moderador:** <@${evento.author}>`
+        await registrarAccion({
+            servidorId: canal.server,
+            tipo: 'unban',
+            usuarioId: idObjetivo,
+            moderadorId: evento.author,
         });
 
         await responder('✅ Baneo removido.');

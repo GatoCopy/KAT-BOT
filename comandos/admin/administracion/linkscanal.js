@@ -4,8 +4,7 @@ const { obtenerCanal } = require('../../../servicios/api');
 module.exports = {
     nombre: 'linkscanal',
     descripcion: 'Administra en qué canales se permite compartir links (requiere !filtrolinks on)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

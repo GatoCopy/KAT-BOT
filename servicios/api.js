@@ -7,12 +7,6 @@ function colorHexANumero(hex) {
     return parseInt(String(hex).replace('#', ''), 16);
 }
 
-/**
- * Convierte el objeto "contenido" que ya usan todos los comandos (string plano,
- * o { embeds: [{ type, title, description, colour }] } al estilo Stoat/Revolt)
- * al formato que espera discord.js. Gracias a esto, ningún comando tuvo que
- * reescribirse al migrar de plataforma.
- */
 function normalizarContenido(contenido) {
     if (typeof contenido === 'string') return { content: contenido };
 
@@ -22,6 +16,7 @@ function normalizarContenido(contenido) {
             const embed = new EmbedBuilder();
             if (e.title) embed.setTitle(e.title);
             if (e.description) embed.setDescription(e.description);
+            if (e.image) embed.setImage(e.image);
             const color = colorHexANumero(e.colour || e.color);
             if (color !== null && !isNaN(color)) embed.setColor(color);
             return embed;
@@ -73,8 +68,6 @@ async function eliminarMensajesEnBloque(channelId, ids) {
     try {
         const canal = await getClient().channels.fetch(channelId);
 
-        // El bulkDelete de Discord solo funciona bien con 2+ mensajes; con 1 o 0
-        // (o si algunos ya tienen más de 14 días) caemos al borrado uno por uno.
         if (ids.length >= 2) {
             const borrados = await canal.bulkDelete(ids, true);
             return borrados.size;
@@ -123,7 +116,7 @@ async function obtenerServidor(serverId) {
         guild.roles.cache.forEach(rol => { rolesObj[rol.id] = { name: rol.name }; });
 
         const categorias = guild.channels.cache
-            .filter(c => c.type === 4) // 4 = GuildCategory en la API de Discord
+            .filter(c => c.type === 4)
             .map(c => c.id);
 
         return {
@@ -156,6 +149,21 @@ async function obtenerMiembrosServidor(serverId) {
     }
 }
 
+/**
+ * Retorna los IDs de todos los miembros que tienen un rol específico.
+ * Se usa para que la IA sepa quiénes son los admins/mods actuales.
+ */
+async function obtenerIdsConRol(serverId, rolId) {
+    try {
+        const guild = await getClient().guilds.fetch(serverId);
+        const miembros = await guild.members.fetch();
+        return [...miembros.filter(m => m.roles.cache.has(rolId)).keys()];
+    } catch (error) {
+        console.error('❌ Error obteniendo miembros con rol:', error);
+        return [];
+    }
+}
+
 async function obtenerUsuario(userId) {
     try {
         const usuario = await getClient().users.fetch(userId);
@@ -164,8 +172,6 @@ async function obtenerUsuario(userId) {
             username: usuario.username,
             display_name: usuario.globalName || usuario.username,
             bot: usuario.bot,
-            // Discord no da presencia (en línea/ausente/etc) sin el intent privilegiado
-            // de Presences, que no pedimos por defecto — se muestra como desconocido.
             status: { presence: null, text: null },
             online: null,
         };
@@ -180,7 +186,6 @@ async function obtenerMiembro(serverId, userId) {
         const guild = await getClient().guilds.fetch(serverId);
         const miembro = await guild.members.fetch(userId);
         return {
-            // Se excluye el rol @everyone (su ID es igual al ID del servidor)
             roles: [...miembro.roles.cache.keys()].filter(id => id !== serverId),
             joined_at: miembro.joinedAt ? miembro.joinedAt.toISOString() : null,
         };
@@ -236,11 +241,6 @@ async function listarBaneos(serverId) {
     }
 }
 
-/**
- * Edita un miembro: roles y/o timeout (suspensión). `data` sigue el mismo
- * formato que ya usaban los comandos: { roles: [...] }, { timeout: isoString },
- * o { remove: ['Timeout'] } para quitar la suspensión.
- */
 async function editarMiembro(serverId, userId, data, razon) {
     try {
         const guild = await getClient().guilds.fetch(serverId);
@@ -276,19 +276,10 @@ async function agregarReaccion(channelId, messageId, emoji) {
     }
 }
 
-/**
- * Verifica si un usuario puede considerarse "administrador/moderador" del
- * servidor: dueño del servidor, o tiene permiso de KickMembers, BanMembers
- * o Administrator. En DMs no hay restricción (igual que antes).
- *
- * NOTA: esto es el chequeo temporal mientras migramos — el sistema de roles
- * configurables (moderador vs administrador, !setrol) quedó pausado a medio
- * construir cuando cambiamos de plataforma y se retoma después de esto.
- */
 async function esAdministrador(channelId, userId) {
     try {
         const canal = await getClient().channels.fetch(channelId);
-        if (!canal?.guild) return true; // DM / sin servidor
+        if (!canal?.guild) return true;
 
         if (canal.guild.ownerId === userId) return true;
 
@@ -314,6 +305,7 @@ module.exports = {
     obtenerCanal,
     obtenerServidor,
     obtenerMiembrosServidor,
+    obtenerIdsConRol,
     obtenerUsuario,
     obtenerMiembro,
     esAdministrador,

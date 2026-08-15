@@ -5,11 +5,18 @@ const { PREFIX, COLOR_SERVER } = require('../../config/constantes');
 // categoría nueva (una carpeta nueva en comandos/) y no la pones aquí, el
 // comando sigue funcionando solo — se muestra con el nombre "crudo" capitalizado.
 const NOMBRES_CATEGORIA = {
-    admin: '🔒 Moderación y Administración',
+    administracion: '🔒 Administración',
+    moderacion: '🛡️ Moderación',
     diversion: '🎉 Diversión',
     ia: '🤖 Inteligencia Artificial',
     multimedia: '🖼️ Multimedia',
     utilidad: '🛠️ Utilidad',
+};
+
+const ETIQUETA_NIVEL = {
+    publico: '🌐 Uso público',
+    moderador: '🛡️ Moderadores y superior',
+    administrador: '🔒 Solo administradores',
 };
 
 function nombreCategoria(cat) {
@@ -32,7 +39,6 @@ module.exports = {
     nombre: 'help',
     descripcion: 'Muestra las categorías de comandos, los comandos de una categoría, o el detalle de uno',
     categoria: 'utilidad',
-    soloAdmin: false,
 
     ejecutar: async (evento, args, responder) => {
         const grupos = agruparPorCategoria();
@@ -76,7 +82,7 @@ module.exports = {
         // ¿El argumento es el nombre de un comando?
         const comando = commands.get(consulta);
         if (comando) {
-            const etiquetaAdmin = comando.soloAdmin ? '🔒 Solo administradores' : '🌐 Uso público';
+            const etiquetaNivel = ETIQUETA_NIVEL[comando.nivel] || ETIQUETA_NIVEL.publico;
             return await responder({
                 embeds: [{
                     type: 'Text',
@@ -84,7 +90,7 @@ module.exports = {
                     description:
                         `${comando.descripcion || '*Sin descripción.*'}\n\n` +
                         `**Categoría:** ${nombreCategoria(comando.categoria)}\n` +
-                        `**Acceso:** ${etiquetaAdmin}`,
+                        `**Acceso:** ${etiquetaNivel}`,
                     colour: COLOR_SERVER
                 }]
             });

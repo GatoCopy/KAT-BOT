@@ -13,16 +13,15 @@ if (!TOKEN) {
     process.exit(1);
 }
 
-// Cargar todos los comandos desde la carpeta principal
 cargarComandos(path.join(__dirname, 'comandos'));
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,          // necesario para leer texto de comandos con !prefijo
-        GatewayIntentBits.GuildMembers,             // necesario para kick/ban/roles/autoroles
-        GatewayIntentBits.GuildMessageReactions,    // necesario para autoroles por reacción
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessageReactions,
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
@@ -33,9 +32,6 @@ for (const [nombreEvento, handler] of eventos.entries()) {
     client.on(nombreEvento, handler);
 }
 
-// El scheduler de recordatorios corre independiente de discord.js — usa la
-// API REST directamente, así que sigue funcionando aunque el gateway se
-// esté reconectando.
 iniciarSchedulerRecordatorios();
 
 client.login(TOKEN);

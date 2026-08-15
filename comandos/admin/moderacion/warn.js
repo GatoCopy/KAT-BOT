@@ -8,8 +8,7 @@ const UMBRAL_AVISO = 3; // a partir de cuántos warns se avisa al moderador para
 module.exports = {
     nombre: 'warn',
     descripcion: 'Agrega una advertencia a un usuario',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
@@ -33,9 +32,12 @@ module.exports = {
 
         const total = contarWarns(canal.server, idObjetivo);
 
-        await registrarAccion(canal.server, {
-            titulo: '⚠️ Advertencia',
-            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Total de warns:** ${total}\n**Razón:** ${razon || 'Sin razón especificada'}`
+        await registrarAccion({
+            servidorId: canal.server,
+            tipo: 'warn',
+            usuarioId: idObjetivo,
+            moderadorId: evento.author,
+            detalle: `**Total de warns:** ${total}\n**Razón:** ${razon || 'Sin razón especificada'}`
         });
 
         let mensaje = `⚠️ Usuario advertido. Lleva **${total}** warn(s) en este servidor.${razon ? `\n**Razón:** ${razon}` : ''}`;

@@ -1,15 +1,13 @@
 const { PREFIX } = require('../config/constantes');
 const { enviarMensaje } = require('../servicios/api');
-const { esAdministradorCacheado } = require('../utilidades/cacheAdmins');
+const { obtenerNivelCacheado } = require('../utilidades/cacheNiveles');
 const { revisarMensaje } = require('../servicios/automod');
 const { commands } = require('../utilidades/cargadorComandos');
 
 module.exports = async function manejarMessage(message) {
-    if (message.author.bot) return;   // ignora bots, incluido a nosotros mismos
-    if (!message.guild) return;       // ignoramos DMs, igual que antes
+    if (message.author.bot) return;
+    if (!message.guild) return;
 
-    // Normalizamos el objeto nativo de discord.js a la misma forma "evento"
-    // que ya usaban todos los comandos (evento.channel, evento.author, etc.)
     const evento = {
         _id: message.id,
         channel: message.channel.id,
@@ -21,7 +19,6 @@ module.exports = async function manejarMessage(message) {
     const texto = evento.content.trim();
     if (!texto) return;
 
-    // Auto-moderación: revisa TODO mensaje, no solo comandos
     const accionTomada = await revisarMensaje(evento);
     if (accionTomada) return;
 
@@ -33,12 +30,16 @@ module.exports = async function manejarMessage(message) {
     const comando = commands.get(nombreComando);
     if (!comando) return;
 
-    if (comando.soloAdmin) {
-        const tienePermiso = await esAdministradorCacheado(evento.channel, evento.author);
-        if (!tienePermiso) {
+    if (comando.nivel && comando.nivel !== 'publico') {
+        const nivelUsuario = await obtenerNivelCacheado(evento.channel, evento.author);
+        const suficiente =
+            nivelUsuario === 'administrador' ||
+            (nivelUsuario === 'moderador' && comando.nivel === 'moderador');
+
+        if (!suficiente) {
             return await enviarMensaje(
                 evento.channel,
-                '🚫 **Acceso denegado:** Solo administradores pueden usar este comando.'
+                `🚫 **Acceso denegado:** este comando requiere nivel **${comando.nivel}**.`
             );
         }
     }

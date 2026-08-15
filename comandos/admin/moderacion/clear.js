@@ -3,8 +3,7 @@ const { enviarMensaje, obtenerMensajes, eliminarMensajesEnBloque, eliminarMensaj
 module.exports = {
     nombre: 'clear',
     descripcion: 'Elimina una cantidad de mensajes recientes del canal',
-    categoria: 'admin',
-    soloAdmin: true, // ¡Importante! Solo admins deben poder borrar mensajes
+    categoria: 'moderacion',
 
     async ejecutar(evento, args, responder) {
         const cantidad = parseInt(args[0]);

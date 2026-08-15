@@ -6,8 +6,7 @@ const { formatearDuracion } = require('../../../utilidades/tiempo');
 module.exports = {
     nombre: 'antiflood',
     descripcion: 'Activa/desactiva la protección automática contra flood (mensajes muy seguidos)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

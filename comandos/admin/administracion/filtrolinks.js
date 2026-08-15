@@ -4,8 +4,7 @@ const { obtenerConfigAutomod, actualizarConfigAutomod } = require('../../../serv
 module.exports = {
     nombre: 'filtrolinks',
     descripcion: 'Activa/desactiva que se bloqueen links fuera de los canales permitidos',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

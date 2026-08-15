@@ -2,6 +2,8 @@ const { preguntarIA, preguntarIAConHistorial } = require('../../servicios/groq')
 const { esCanalIA } = require('../../servicios/canalesIA');
 const { obtenerHistorial, agregarMensaje } = require('../../utilidades/historialIA');
 const { obtenerNombreUsuario } = require('../../utilidades/cacheUsuarios');
+const { obtenerCanal } = require('../../servicios/api');
+const { obtenerContextoCacheado } = require('../../utilidades/cacheContextoServidor');
 
 module.exports = {
     nombre: 'kat',
@@ -17,6 +19,12 @@ module.exports = {
 
         await responder('💭 *KAT está pensando...*');
 
+        // Si el mensaje viene de un servidor, le damos a la IA el contexto base
+        // (reglas configuradas + admins/mods actuales) para que pueda responder
+        // preguntas sobre el server sin decir "no sé de qué hablas".
+        const canal = await obtenerCanal(evento.channel);
+        const contextoServidor = canal?.server ? await obtenerContextoCacheado(canal.server) : null;
+
         const conMemoria = esCanalIA(evento.channel);
         let resultado;
 
@@ -28,14 +36,14 @@ module.exports = {
             agregarMensaje(evento.channel, 'user', `${nombreUsuario}: ${pregunta}`);
 
             const historial = obtenerHistorial(evento.channel);
-            resultado = await preguntarIAConHistorial(historial);
+            resultado = await preguntarIAConHistorial(historial, contextoServidor);
 
             if (resultado.texto) {
                 agregarMensaje(evento.channel, 'assistant', resultado.texto);
             }
         } else {
             // Sin memoria: comportamiento clásico, pregunta y respuesta aisladas.
-            resultado = await preguntarIA(pregunta);
+            resultado = await preguntarIA(pregunta, contextoServidor);
         }
 
         const { texto, error } = resultado;

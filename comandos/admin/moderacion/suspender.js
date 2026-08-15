@@ -6,8 +6,7 @@ const { parsearDuracion, formatearDuracion } = require('../../../utilidades/tiem
 module.exports = {
     nombre: 'suspender',
     descripcion: 'Suspende temporalmente a un miembro (no puede enviar mensajes ni reaccionar durante ese tiempo)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
@@ -35,9 +34,12 @@ module.exports = {
             return await responder('❌ No pude suspender a ese usuario. Verifica el ID/mención y que el bot tenga permiso `TimeoutMembers`.');
         }
 
-        await registrarAccion(canal.server, {
-            titulo: '🔇 Suspensión',
-            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Duración:** ${formatearDuracion(duracionMs)}\n**Razón:** ${razon || 'Sin razón especificada'}`
+        await registrarAccion({
+            servidorId: canal.server,
+            tipo: 'suspension',
+            usuarioId: idObjetivo,
+            moderadorId: evento.author,
+            detalle: `**Duración:** ${formatearDuracion(duracionMs)}\n**Razón:** ${razon || 'Sin razón especificada'}`
         });
 
         await responder(

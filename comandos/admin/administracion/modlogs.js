@@ -4,8 +4,7 @@ const { activarLogs, desactivarLogs, obtenerCanalLogs } = require('../../../serv
 module.exports = {
     nombre: 'modlogs',
     descripcion: 'Activa/desactiva el canal de logs de moderación (usa el canal donde ejecutes esto)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

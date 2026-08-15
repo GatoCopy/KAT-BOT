@@ -6,12 +6,19 @@ const path = require('path');
 // puede leer aquí los mismos comandos que index.js cargó.
 const commands = new Map();
 
+const ETIQUETA_NIVEL = {
+    publico: '🌐 [PÚBLICO]',
+    moderador: '🛡️ [MODERADOR]',
+    administrador: '🔒 [ADMIN]',
+};
+
 /**
  * Carga recursivamente todos los comandos (.js) desde un directorio.
- * Si un archivo está dentro de una carpeta "admin" (o subcarpeta de esta),
- * se le fuerza soloAdmin = true automáticamente.
+ * El nivel de permiso se infiere del nombre de la carpeta contenedora:
+ * "moderacion" -> nivel moderador, "administracion" -> nivel administrador.
+ * Una vez detectado, se propaga a cualquier subcarpeta anidada dentro.
  */
-function cargarComandos(directorio, esAdminFolder = false) {
+function cargarComandos(directorio, nivelHeredado = null) {
     if (!fs.existsSync(directorio)) {
         fs.mkdirSync(directorio, { recursive: true });
         return;
@@ -23,20 +30,20 @@ function cargarComandos(directorio, esAdminFolder = false) {
         const rutaAbsoluta = path.join(directorio, elemento.name);
 
         if (elemento.isDirectory()) {
-            const esSubAdmin = esAdminFolder || elemento.name.toLowerCase() === 'admin';
-            cargarComandos(rutaAbsoluta, esSubAdmin);
+            let nivelParaSubcarpeta = nivelHeredado;
+            const nombreCarpeta = elemento.name.toLowerCase();
+            if (nombreCarpeta === 'moderacion') nivelParaSubcarpeta = 'moderador';
+            if (nombreCarpeta === 'administracion') nivelParaSubcarpeta = 'administrador';
+
+            cargarComandos(rutaAbsoluta, nivelParaSubcarpeta);
         } else if (elemento.isFile() && elemento.name.endsWith('.js')) {
-            delete require.cache[require.resolve(rutaAbsoluta)];
+            delete require.cache[require.resolve(rutaAbsoluta)]; // limpiar caché por si hay reinicios
             const comando = require(rutaAbsoluta);
 
-            if (esAdminFolder) {
-                comando.soloAdmin = true;
-            }
+            comando.nivel = nivelHeredado || comando.nivel || 'publico';
 
             commands.set(comando.nombre, comando);
-
-            const etiquetaAdmin = comando.soloAdmin ? '🔒 [ADMIN]' : '🌐 [PÚBLICO]';
-            console.log(`✅ Comando cargado: !${comando.nombre} ${etiquetaAdmin}`);
+            console.log(`✅ Comando cargado: !${comando.nombre} ${ETIQUETA_NIVEL[comando.nivel]}`);
         }
     }
 }

@@ -6,8 +6,7 @@ const { COLOR_SERVER } = require('../../../config/constantes');
 module.exports = {
     nombre: 'palabraprohibida',
     descripcion: 'Administra la lista de palabras prohibidas del servidor (se borran y se avisa, sin warn formal)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

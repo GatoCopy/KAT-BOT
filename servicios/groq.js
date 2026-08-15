@@ -26,11 +26,15 @@ ${REGLAS_ESTILO}
 - En cuanto termines tu idea, DETENTE. No sigas generando más texto ni más "turnos" simulados.
 - Puede haber varias personas distintas escribiendo en el mismo canal. Cada mensaje viene etiquetado como "Nombre: mensaje" para que sepas quién dice qué — dirígete a la persona correcta cuando sea relevante, pero no repitas su nombre en cada respuesta si no hace falta.`;
 
-async function llamarGroq(mensajes, systemPrompt) {
+async function llamarGroq(mensajes, systemPrompt, contextoServidor) {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
         return { texto: null, error: 'GROQ_API_KEY_MISSING' };
     }
+
+    const promptFinal = contextoServidor
+        ? `${systemPrompt}\n\n${contextoServidor}`
+        : systemPrompt;
 
     try {
         const response = await fetch(GROQ_URL, {
@@ -42,7 +46,7 @@ async function llamarGroq(mensajes, systemPrompt) {
             body: JSON.stringify({
                 model: MODELO,
                 messages: [
-                    { role: 'system', content: systemPrompt },
+                    { role: 'system', content: promptFinal },
                     ...mensajes
                 ],
                 max_tokens: MAX_TOKENS
@@ -70,9 +74,11 @@ async function llamarGroq(mensajes, systemPrompt) {
 
 /**
  * Uso simple: una sola pregunta, sin contexto previo (comando !kat).
+ * `contextoServidor` es opcional: un bloque de texto con info del server
+ * (reglas, admins/mods actuales) que se agrega al system prompt.
  */
-async function preguntarIA(pregunta) {
-    return llamarGroq([{ role: 'user', content: pregunta }], SYSTEM_PROMPT_UNICO);
+async function preguntarIA(pregunta, contextoServidor) {
+    return llamarGroq([{ role: 'user', content: pregunta }], SYSTEM_PROMPT_UNICO, contextoServidor);
 }
 
 /**
@@ -96,9 +102,10 @@ function limitarAUnTurno(texto) {
 /**
  * Uso con contexto: recibe el historial completo de la conversación
  * (array de { role: 'user' | 'assistant', content }) para canales en modo conversación.
+ * `contextoServidor` es opcional, igual que en preguntarIA.
  */
-async function preguntarIAConHistorial(mensajes) {
-    const resultado = await llamarGroq(mensajes, SYSTEM_PROMPT_CONVERSACION);
+async function preguntarIAConHistorial(mensajes, contextoServidor) {
+    const resultado = await llamarGroq(mensajes, SYSTEM_PROMPT_CONVERSACION, contextoServidor);
     if (resultado.texto) {
         resultado.texto = limitarAUnTurno(resultado.texto);
     }

@@ -90,6 +90,37 @@ db.exec(`
         canal_id TEXT NOT NULL,
         PRIMARY KEY (servidor_id, canal_id)
     );
+
+    CREATE TABLE IF NOT EXISTS info_servidor (
+        servidor_id TEXT PRIMARY KEY,
+        contenido TEXT NOT NULL,
+        actualizado_en INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS roles_config (
+        servidor_id TEXT PRIMARY KEY,
+        rol_moderador_id TEXT,
+        rol_administrador_id TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS historial_moderacion (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        servidor_id TEXT NOT NULL,
+        usuario_id TEXT,
+        moderador_id TEXT,
+        tipo TEXT NOT NULL,
+        detalle TEXT,
+        creado_en INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS invitaciones_uso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        servidor_id TEXT NOT NULL,
+        usuario_id TEXT NOT NULL,
+        codigo_invitacion TEXT,
+        invitado_por TEXT,
+        creado_en INTEGER NOT NULL
+    );
 `);
 
 module.exports = db;

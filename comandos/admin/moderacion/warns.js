@@ -6,8 +6,7 @@ const { COLOR_SERVER } = require('../../../config/constantes');
 module.exports = {
     nombre: 'warns',
     descripcion: 'Lista las advertencias de un usuario',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);

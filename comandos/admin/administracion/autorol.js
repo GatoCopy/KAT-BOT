@@ -5,8 +5,7 @@ const { COLOR_SERVER } = require('../../../config/constantes');
 module.exports = {
     nombre: 'autorol',
     descripcion: 'Configura roles automáticos por reacción a un mensaje',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'administracion',
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

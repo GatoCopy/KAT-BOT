@@ -4,7 +4,7 @@ const { obtenerPalabrasProhibidas } = require('./palabrasProhibidas');
 const { canalPermiteLinks } = require('./canalesLinks');
 const { registrarAccion } = require('./logs');
 const { obtenerServidorDeCanal } = require('../utilidades/cacheCanales');
-const { esAdministradorCacheado } = require('../utilidades/cacheAdmins');
+const { obtenerNivelCacheado } = require('../utilidades/cacheNiveles');
 const { registrarMensaje } = require('../utilidades/antiflood');
 const { formatearDuracion } = require('../utilidades/tiempo');
 const { ANTIFLOOD_SUSPENSION_MS } = require('../config/constantes');
@@ -24,9 +24,9 @@ async function revisarMensaje(evento) {
     const algoActivado = config.antiflood_activado || config.filtro_palabras_activado || config.filtro_links_activado;
     if (!algoActivado) return false; // nada que revisar, no vale la pena ni chequear admin
 
-    // Los administradores quedan exentos de la auto-moderación.
-    const esAdmin = await esAdministradorCacheado(evento.channel, evento.author);
-    if (esAdmin) return false;
+    // Moderadores y administradores quedan exentos de la auto-moderación.
+    const nivel = await obtenerNivelCacheado(evento.channel, evento.author);
+    if (nivel !== 'publico') return false;
 
     const texto = evento.content || '';
 
@@ -59,9 +59,11 @@ async function revisarPalabrasProhibidas(evento, servidorId, texto) {
     await eliminarMensaje(evento.channel, evento._id).catch(() => {});
     await enviarMensaje(evento.channel, `🚫 <@${evento.author}>, ese mensaje se eliminó por contener una palabra no permitida en este servidor.`);
 
-    await registrarAccion(servidorId, {
-        titulo: '🚫 Filtro de palabras',
-        descripcion: `**Usuario:** <@${evento.author}>\n**Canal:** <#${evento.channel}>\n**Mensaje:** ${texto.substring(0, 200)}`
+    await registrarAccion({
+        servidorId,
+        tipo: 'auto-palabra',
+        usuarioId: evento.author,
+        detalle: `**Canal:** <#${evento.channel}>\n**Mensaje:** ${texto.substring(0, 200)}`
     });
 
     return true;
@@ -74,9 +76,11 @@ async function revisarLinks(evento, servidorId, texto) {
     await eliminarMensaje(evento.channel, evento._id).catch(() => {});
     await enviarMensaje(evento.channel, `🔗 <@${evento.author}>, no se permiten enlaces en este canal.`);
 
-    await registrarAccion(servidorId, {
-        titulo: '🔗 Link no autorizado',
-        descripcion: `**Usuario:** <@${evento.author}>\n**Canal:** <#${evento.channel}>\n**Mensaje:** ${texto.substring(0, 200)}`
+    await registrarAccion({
+        servidorId,
+        tipo: 'auto-link',
+        usuarioId: evento.author,
+        detalle: `**Canal:** <#${evento.channel}>\n**Mensaje:** ${texto.substring(0, 200)}`
     });
 
     return true;
@@ -96,9 +100,11 @@ async function revisarFlood(evento, servidorId) {
         `🔇 <@${evento.author}> fue suspendido **${formatearDuracion(ANTIFLOOD_SUSPENSION_MS)}** por enviar mensajes demasiado rápido.`
     );
 
-    await registrarAccion(servidorId, {
-        titulo: '⚡ Antiflood',
-        descripcion: `**Usuario:** <@${evento.author}>\n**Canal:** <#${evento.channel}>\n**Suspendido por:** ${formatearDuracion(ANTIFLOOD_SUSPENSION_MS)}`
+    await registrarAccion({
+        servidorId,
+        tipo: 'auto-flood',
+        usuarioId: evento.author,
+        detalle: `**Canal:** <#${evento.channel}>\n**Suspendido por:** ${formatearDuracion(ANTIFLOOD_SUSPENSION_MS)}`
     });
 
     return true;

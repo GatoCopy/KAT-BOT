@@ -8,7 +8,6 @@ module.exports = async function manejarMessageReact(reaction, user) {
         try { await reaction.fetch(); } catch { return; }
     }
 
-    // Emoji personalizado del server -> usa su ID; emoji unicode -> usa el carácter
     const emojiId = reaction.emoji.id || reaction.emoji.name;
 
     const autorol = obtenerAutorol(reaction.message.id, emojiId);

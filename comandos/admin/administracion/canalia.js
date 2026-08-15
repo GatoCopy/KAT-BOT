@@ -5,7 +5,6 @@ module.exports = {
     nombre: 'canalia',
     descripcion: 'Activa/desactiva que !kat recuerde la conversación en este canal (hasta 20 peticiones)',
     categoria: 'ia',
-    soloAdmin: true, // se fuerza también por estar en comandos/admin/, queda explícito a propósito
 
     ejecutar: async (evento, args, responder) => {
         const accion = (args[0] || '').toLowerCase();

@@ -5,8 +5,7 @@ const { limpiarId } = require('../../../utilidades/parseMencion');
 module.exports = {
     nombre: 'ban',
     descripcion: 'Banea a un usuario del servidor (no puede volver a entrar con invitación)',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const idObjetivo = limpiarId(args[0]);
@@ -26,9 +25,12 @@ module.exports = {
             return await responder('❌ No pude banear a ese usuario. Verifica el ID/mención y que el bot tenga permiso `BanMembers`.');
         }
 
-        await registrarAccion(canal.server, {
-            titulo: '🔨 Baneo',
-            descripcion: `**Usuario:** <@${idObjetivo}>\n**Moderador:** <@${evento.author}>\n**Razón:** ${razon || 'Sin razón especificada'}`
+        await registrarAccion({
+            servidorId: canal.server,
+            tipo: 'ban',
+            usuarioId: idObjetivo,
+            moderadorId: evento.author,
+            detalle: `**Razón:** ${razon || 'Sin razón especificada'}`
         });
 
         await responder(`🔨 Usuario baneado.${razon ? `\n**Razón:** ${razon}` : ''}`);

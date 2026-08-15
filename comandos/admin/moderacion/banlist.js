@@ -4,8 +4,7 @@ const { COLOR_SERVER } = require('../../../config/constantes');
 module.exports = {
     nombre: 'banlist',
     descripcion: 'Lista los usuarios baneados del servidor',
-    categoria: 'admin',
-    soloAdmin: true,
+    categoria: 'moderacion',
 
     ejecutar: async (evento, args, responder) => {
         const canal = await obtenerCanal(evento.channel);
