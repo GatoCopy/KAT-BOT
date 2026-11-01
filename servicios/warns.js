@@ -34,4 +34,12 @@ function eliminarWarn(id, servidorId) {
     return info.changes > 0;
 }
 
-module.exports = { crearWarn, obtenerWarns, contarWarns, eliminarWarn };
+/**
+ * Elimina TODOS los warns de un usuario en un servidor. Retorna cuántos borró.
+ */
+function eliminarTodosLosWarns(servidorId, usuarioId) {
+    const info = db.prepare(`DELETE FROM warns WHERE servidor_id = ? AND usuario_id = ?`).run(servidorId, usuarioId);
+    return info.changes;
+}
+
+module.exports = { crearWarn, obtenerWarns, contarWarns, eliminarWarn, eliminarTodosLosWarns };

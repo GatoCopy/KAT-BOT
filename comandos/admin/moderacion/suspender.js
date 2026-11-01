@@ -2,6 +2,9 @@ const { obtenerCanal, editarMiembro } = require('../../../servicios/api');
 const { registrarAccion } = require('../../../servicios/logs');
 const { limpiarId } = require('../../../utilidades/parseMencion');
 const { parsearDuracion, formatearDuracion } = require('../../../utilidades/tiempo');
+const { validarObjetivo } = require('../../../utilidades/jerarquia');
+
+const MAX_SUSPENSION_MS = 28 * 24 * 60 * 60 * 1000; // límite de Discord para un timeout: 28 días
 
 module.exports = {
     nombre: 'suspender',
@@ -20,11 +23,20 @@ module.exports = {
             );
         }
 
+        if (duracionMs > MAX_SUSPENSION_MS) {
+            return await responder('⚠️ Discord solo permite suspender hasta **28 días** (`28d`). Para algo más largo usa `!tempban`.');
+        }
+
         const razon = args.slice(2).join(' ') || null;
 
         const canal = await obtenerCanal(evento.channel);
         if (!canal?.server) {
             return await responder('⚠️ Este comando solo funciona dentro de un servidor.');
+        }
+
+        const validacion = await validarObjetivo(evento, canal.server, idObjetivo);
+        if (!validacion.ok) {
+            return await responder(`🚫 ${validacion.motivo}`);
         }
 
         const hasta = new Date(Date.now() + duracionMs).toISOString();

@@ -8,7 +8,6 @@ const NOMBRES_CATEGORIA = {
     administracion: '🔒 Administración',
     moderacion: '🛡️ Moderación',
     diversion: '🎉 Diversión',
-    ia: '🤖 Inteligencia Artificial',
     multimedia: '🖼️ Multimedia',
     utilidad: '🛠️ Utilidad',
 };

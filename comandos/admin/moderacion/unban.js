@@ -1,6 +1,7 @@
 const { obtenerCanal, desbanearUsuario } = require('../../../servicios/api');
 const { registrarAccion } = require('../../../servicios/logs');
 const { limpiarId } = require('../../../utilidades/parseMencion');
+const { cancelarTempbans } = require('../../../servicios/tempbans');
 
 module.exports = {
     nombre: 'unban',
@@ -22,6 +23,9 @@ module.exports = {
         if (!exito) {
             return await responder('❌ No pude quitar el baneo. Verifica el ID y que el bot tenga permiso `BanMembers`.');
         }
+
+        // Si era un tempban, el desbaneo manual lo adelanta: que el scheduler no lo intente de nuevo.
+        cancelarTempbans(canal.server, idObjetivo);
 
         await registrarAccion({
             servidorId: canal.server,

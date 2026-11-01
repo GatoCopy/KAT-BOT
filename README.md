@@ -1,6 +1,6 @@
 # 🐱 KAT — Bot multipropósito para Discord
 
-KAT es un bot modular para servidores de Discord, con comandos de moderación, ocio, multimedia e integración con IA (Groq). Desarrollado por **Alexander Jerrard (CopyCat)**.
+KAT es un bot modular para servidores de Discord, con comandos de moderación, auto-moderación, utilidad, ocio y multimedia. Desarrollado por **Alexander Jerrard (CopyCat)**.
 
 ---
 
@@ -8,45 +8,53 @@ KAT es un bot modular para servidores de Discord, con comandos de moderación, o
 
 ```
 kat-bot/
-├── index.js                 # Punto de entrada: conecta el WebSocket y carga comandos
+├── index.js                 # Punto de entrada: conecta el bot y carga comandos
 ├── ecosystem.config.js      # Configuración de PM2
 ├── .env                     # Variables de entorno (NO subir a git)
 │
 ├── comandos/                # Todos los comandos del bot, organizados por categoría
-│   ├── admin/                # Comandos que requieren permisos de administrador
+│   ├── admin/
+│   │   ├── moderacion/        # Comandos de moderación (nivel moderador)
+│   │   └── administracion/    # Configuración del bot (nivel administrador)
 │   ├── diversion/             # Comandos de entretenimiento
-│   ├── ia/                    # Comandos relacionados con IA
 │   ├── multimedia/            # Embeds, imágenes, etc.
-│   └── utilidad/               # Comandos de utilidad general
+│   └── utilidad/              # Comandos de utilidad general
 │
-├── eventos/                  # Handlers de cada tipo de evento del WebSocket
-│   ├── authenticated.js
+├── eventos/                  # Handlers de eventos de Discord
 │   ├── ready.js
-│   └── message.js
+│   ├── message.js
+│   ├── messageReact.js / messageUnreact.js   # Autoroles por reacción
+│   ├── memberAdd.js                          # Rastreo de invitaciones + bienvenida
+│   └── memberRemove.js                       # Despedida
 │
-├── servicios/                # Lógica reutilizable (llamadas a APIs externas)
+├── servicios/                # Lógica reutilizable
 │   ├── api.js                  # Funciones para hablar con la API de Discord (vía discord.js)
-│   ├── groq.js                 # Función para hablar con la API de Groq (IA)
-│   ├── db.js                   # Conexión y esquema de la base de datos SQLite
+│   ├── db.js                   # Conexión, esquema y migraciones de la base SQLite
 │   ├── recordatorios.js        # Acceso a datos de recordatorios
 │   ├── encuestas.js            # Acceso a datos de encuestas y votos
 │   ├── warns.js                # Acceso a datos de advertencias
-│   ├── autoroles.js            # Acceso a datos de autoroles (reacción → rol)
-│   ├── canalesIA.js            # Activación de memoria de !kat por canal
-│   ├── logs.js                 # Canal de logs de moderación + función para publicar ahí
-│   ├── automod.js              # Motor que revisa cada mensaje (palabras, links, flood)
+│   ├── tempbans.js             # Baneos temporales pendientes
+│   ├── autoroles.js            # Autoroles (reacción → rol)
+│   ├── bienvenida.js           # Mensajes de bienvenida/despedida
+│   ├── logs.js                 # Canal de logs de moderación + historial
+│   ├── automod.js              # Motor que revisa cada mensaje (palabras, links, invitaciones, menciones, flood)
 │   ├── automodConfig.js        # On/off de cada sistema de auto-moderación, por servidor
 │   ├── palabrasProhibidas.js   # Lista de palabras prohibidas por servidor
 │   ├── canalesLinks.js         # Canales donde sí se permiten links (whitelist)
-│   └── scheduler.js            # Revisa periódicamente recordatorios vencidos
+│   ├── roles.js                # Roles de moderador/administrador configurados con !setrol
+│   ├── invites.js              # Rastreo de qué invitación usó cada miembro
+│   ├── imagenesAleatorias.js   # Imágenes aleatorias (!gato)
+│   └── scheduler.js            # Revisa periódicamente recordatorios y baneos temporales vencidos
 │
 ├── utilidades/
 │   ├── cargadorComandos.js    # Carga los comandos y expone el Map compartido
+│   ├── jerarquia.js            # Impide que alguien modere a su mismo nivel o superior
+│   ├── crearComandoMensaje.js  # Fábrica de !bienvenida y !despedida
 │   ├── tiempo.js               # Parsea/formatea duraciones ("10m", "2h30m")
-│   ├── parseMencion.js         # Extrae un ID de una mención "<@ID>" o texto plano
-│   ├── historialIA.js          # Historial de conversación en memoria, por canal
+│   ├── parseMencion.js         # Extrae un ID de una mención "<@ID>" / "<#ID>" o texto plano
 │   ├── cacheUsuarios.js        # Cache de nombres de usuario
-│   ├── cacheAdmins.js          # Cache de si un usuario es admin (evita golpear la API por mensaje)
+│   ├── cacheAdmins.js          # Cache de si un usuario es admin
+│   ├── cacheNiveles.js         # Cache del nivel (público/moderador/administrador) de cada usuario
 │   ├── cacheCanales.js         # Cache de a qué servidor pertenece cada canal
 │   └── antiflood.js            # Contador en memoria de mensajes por usuario/canal
 │
@@ -54,7 +62,7 @@ kat-bot/
 │   └── kat.db                # Base de datos SQLite (se crea sola, NO subir a git)
 │
 └── config/
-    └── constantes.js         # PREFIX, colores, URLs, intervalos, etc.
+    └── constantes.js         # PREFIX, colores, límites de auto-moderación, etc.
 ```
 
 ---
@@ -63,56 +71,80 @@ kat-bot/
 
 ```env
 BOT_TOKEN=tu_token_del_bot_aqui
-GROQ_API_KEY=tu_api_key_de_groq_aqui
 ```
 
 - `BOT_TOKEN` (o `DISCORD_TOKEN`/`TOKEN` como alternativa) — token del bot, desde el Developer Portal de Discord.
-- `GROQ_API_KEY` — necesaria solo para el comando `!kat`.
 
 ---
 
-## 🎮 Comandos actuales
+## 🎮 Comandos
 
-| Comando | Categoría | Admin | Descripción |
-|---|---|:---:|---|
-| `!dado` | diversión | ❌ | Tira un dado de 6 caras |
-| `!chiste` | diversión | ❌ | Cuenta un chiste aleatorio |
-| `!bola8 <pregunta>` | diversión | ❌ | Responde preguntas al estilo bola 8 mágica |
-| `!kat <pregunta>` | ia | ❌ | Conversa con la IA de KAT (Groq / Llama 3.3) |
-| `!canalia [on\|off]` | ia | ✅ | Activa/desactiva que `!kat` recuerde la conversación en este canal |
-| `!embed [Título \| Texto]` | multimedia | ❌ | Crea un mensaje embed. Sin argumentos, muestra la guía |
-| `!clear <cantidad>` | admin | ✅ | Elimina entre 1 y 100 mensajes del canal |
-| `!kick <@usuario> [razón]` | admin | ✅ | Expulsa a un miembro (puede volver a unirse con invitación) |
-| `!ban <@usuario> [razón]` | admin | ✅ | Banea a un usuario |
-| `!unban <ID>` | admin | ✅ | Quita el baneo a un usuario |
-| `!banlist` | admin | ✅ | Lista los usuarios baneados del servidor |
-| `!suspender <@usuario> <tiempo> [razón]` | admin | ✅ | Suspende temporalmente a un miembro (timeout) |
-| `!desuspender <@usuario>` | admin | ✅ | Quita la suspensión temporal |
-| `!warn <@usuario> [razón]` | admin | ✅ | Agrega una advertencia a un usuario |
-| `!warns <@usuario>` | admin | ✅ | Lista las advertencias de un usuario |
-| `!delwarn <id>` | admin | ✅ | Elimina una advertencia específica |
-| `!decir [ID canal] <mensaje>` | admin | ✅ | El bot envía un mensaje por ti (anuncios) |
-| `!autorol crear\|quitar\|lista` | admin | ✅ | Configura roles automáticos por reacción |
-| `!modlogs [on\|off]` | admin | ✅ | Canal donde se publican los logs de moderación |
-| `!palabraprohibida agregar\|quitar\|lista` | admin | ✅ | Administra palabras prohibidas (se borran + se avisa) |
-| `!antiflood [on\|off]` | admin | ✅ | Auto-suspende a quien mande mensajes muy seguidos |
-| `!filtrolinks [on\|off]` | admin | ✅ | Bloquea links fuera de canales permitidos |
-| `!linkscanal permitir\|quitar\|lista` | admin | ✅ | Administra qué canales permiten links |
-| `!setrol moderador\|administrador\|ver` | admin | ✅ | Configura qué rol cuenta como moderador/administrador |
-| `!historial <@usuario>` | admin | ✅ | Junta todas las acciones de moderación de un usuario |
-| `!infokat set\|ver\|borrar` | admin | ✅ | Define reglas/info que `!kat` debe conocer del servidor |
-| `!gato` | multimedia | ❌ | Imagen aleatoria de un gato |
-| `!help [categoría\|comando]` | utilidad | ❌ | Menú de categorías, comandos de una categoría, o detalle de uno |
-| `!ping` | utilidad | ❌ | Muestra la latencia actual del bot |
-| `!userinfo [@usuario]` | utilidad | ❌ | Info de un usuario (o de quien ejecuta el comando) |
-| `!serverinfo` | utilidad | ❌ | Info general del servidor (miembros, canales, roles, dueño) |
-| `!recordatorio <tiempo> <mensaje>` | utilidad | ❌ | Crea un recordatorio persistente (ej: `1h30m`) |
-| `!misrecordatorios` | utilidad | ❌ | Lista tus recordatorios pendientes |
-| `!encuesta <pregunta> \| <op1> \| <op2>...` | utilidad | ❌ | Crea una encuesta con hasta 9 opciones |
-| `!votar <id> <número>` | utilidad | ❌ | Vota (o cambia tu voto) en una encuesta |
-| `!cerrarencuesta <id>` | utilidad | ❌* | Cierra y muestra resultados (*solo creador o admin*) |
+### 🌐 Públicos
 
-> Los comandos dentro de `comandos/admin/` (o cualquier subcarpeta suya) se marcan automáticamente como `soloAdmin: true`, sin importar lo que digas en el archivo — no hace falta declararlo a mano, aunque es buena práctica dejarlo explícito para que se entienda al leer el código.
+| Comando | Categoría | Descripción |
+|---|---|---|
+| `!help [categoría\|comando]` | utilidad | Menú de categorías, comandos de una categoría, o detalle de uno |
+| `!ping` | utilidad | Muestra la latencia actual del bot |
+| `!botinfo` | utilidad | Versión, tiempo encendido, servidores y comandos de KAT |
+| `!userinfo [@usuario]` | utilidad | Info de un usuario (o de quien ejecuta el comando) |
+| `!avatar [@usuario]` | utilidad | Avatar de un usuario en grande |
+| `!serverinfo` | utilidad | Info general del servidor (miembros, canales, roles, dueño) |
+| `!roleinfo <@rol>` | utilidad | Info de un rol (miembros, color, posición...) |
+| `!recordatorio <tiempo> <mensaje>` | utilidad | Crea un recordatorio persistente (ej: `1h30m`) |
+| `!misrecordatorios` | utilidad | Lista tus recordatorios pendientes |
+| `!encuesta <pregunta> \| <op1> \| <op2>...` | utilidad | Crea una encuesta con hasta 9 opciones |
+| `!votar <id> <número>` | utilidad | Vota (o cambia tu voto) en una encuesta |
+| `!cerrarencuesta <id>` | utilidad | Cierra y muestra resultados (*solo creador o admin*) |
+| `!dado` | diversión | Tira un dado de 6 caras |
+| `!moneda` | diversión | Cara o cruz |
+| `!elegir <a> \| <b> \| ...` | diversión | Elige una opción al azar |
+| `!chiste` | diversión | Cuenta un chiste aleatorio |
+| `!bola8 <pregunta>` | diversión | Responde al estilo bola 8 mágica |
+| `!gato` | multimedia | Imagen aleatoria de un gato |
+| `!embed [Título \| Texto]` | multimedia | Crea un mensaje embed. Sin argumentos, muestra la guía |
+
+### 🛡️ Moderación (moderadores y superior)
+
+| Comando | Descripción |
+|---|---|
+| `!warn <@usuario> [razón]` | Agrega una advertencia |
+| `!warns <@usuario>` | Lista las advertencias de un usuario |
+| `!delwarn <id>` | Elimina una advertencia específica |
+| `!clearwarns <@usuario>` | Elimina **todas** las advertencias de un usuario |
+| `!nota <@usuario> <texto>` | Nota interna sobre un usuario (aparece en `!historial`) |
+| `!historial <@usuario>` | Todas las acciones de moderación de un usuario |
+| `!suspender <@usuario> <tiempo> [razón]` | Suspende temporalmente (timeout, máx. 28 días) |
+| `!desuspender <@usuario>` | Quita la suspensión |
+| `!kick <@usuario> [razón]` | Expulsa a un miembro |
+| `!ban <@usuario> [razón]` | Banea a un usuario |
+| `!tempban <@usuario> <tiempo> [razón]` | Banea por un tiempo; el bot lo desbanea solo |
+| `!unban <ID>` | Quita el baneo |
+| `!banlist` | Lista los baneados del servidor |
+| `!nick <@usuario> <apodo\|reset>` | Cambia o restablece el apodo de un miembro |
+| `!rol dar\|quitar <@usuario> <@rol>` | Da o quita un rol (solo roles por debajo del tuyo) |
+| `!clear <cantidad>` | Elimina entre 1 y 100 mensajes del canal |
+| `!lock [#canal] [razón]` | Bloquea un canal (nadie puede escribir) |
+| `!unlock [#canal]` | Desbloquea un canal |
+| `!slowmode <tiempo\|off>` | Modo lento del canal (máx. 6h) |
+
+### 🔒 Administración (solo administradores)
+
+| Comando | Descripción |
+|---|---|
+| `!setrol moderador\|administrador\|ver` | Configura qué rol cuenta como moderador/administrador |
+| `!modlogs [on\|off]` | Canal donde se publican los logs de moderación |
+| `!autorol crear\|quitar\|lista` | Roles automáticos por reacción |
+| `!bienvenida on\|set\|off\|ver\|probar` | Mensaje cuando alguien entra al servidor |
+| `!despedida on\|set\|off\|ver\|probar` | Mensaje cuando alguien sale del servidor |
+| `!palabraprohibida agregar\|quitar\|lista` | Palabras prohibidas (se borran + se avisa) |
+| `!filtrolinks [on\|off]` | Bloquea links fuera de canales permitidos |
+| `!linkscanal permitir\|quitar\|lista` | Qué canales permiten links |
+| `!filtroinvitaciones [on\|off]` | Bloquea invitaciones a otros servidores de Discord |
+| `!antimenciones [on\|off]` | Borra mensajes que mencionan a demasiadas personas |
+| `!antiflood [on\|off]` | Auto-suspende a quien mande mensajes muy seguidos |
+| `!decir [ID canal] <mensaje>` | El bot envía un mensaje por ti (anuncios) |
+
+> Los comandos dentro de `comandos/admin/moderacion/` son de nivel **moderador** y los de `comandos/admin/administracion/` de nivel **administrador**; el loader lo asigna solo según la carpeta. Los administradores pueden usar todo lo de moderación.
 
 ---
 
@@ -125,11 +157,10 @@ GROQ_API_KEY=tu_api_key_de_groq_aqui
 module.exports = {
     nombre: 'saludo',              // Lo que el usuario escribirá: !saludo
     descripcion: 'Saluda al usuario',
-    categoria: 'diversion',        // Solo informativo, ayuda a un futuro !help
-    soloAdmin: false,              // true si solo lo pueden usar admins
+    categoria: 'diversion',        // Agrupa el comando en !help
 
     ejecutar: async (evento, args, responder) => {
-        // evento    → el objeto del mensaje original (evento.channel, evento.author, etc.)
+        // evento    → el mensaje original: { _id, channel, author, content, mentions }
         // args      → array con las palabras después del comando: "!saludo Copy" → ['Copy']
         // responder → función para responder: puede recibir texto o un objeto { embeds: [...] }
 
@@ -138,24 +169,25 @@ module.exports = {
 };
 ```
 
-3. Guarda el archivo. **No hay que tocar `index.js`, `help.js`, ni ningún otro archivo** — el loader recorre `comandos/` de forma recursiva y lo detecta solo la próxima vez que reinicies el bot (`pm2 restart KAT` o `node index.js`). `!help` también se actualiza solo: agrupa por el campo `categoria` que pongas en cada comando, así que si usas una categoría que ya existe (`admin`, `diversion`, `ia`, `multimedia`, `utilidad`) aparece ahí mismo; si inventas una categoría nueva (ej. `categoria: 'musica'`), también aparece automáticamente en `!help`, solo que sin un emoji bonito asignado — para eso, opcionalmente puedes agregar una línea en `NOMBRES_CATEGORIA` dentro de `comandos/utilidad/help.js`, pero no es obligatorio.
+3. Guarda el archivo. **No hay que tocar `index.js`, `help.js`, ni ningún otro archivo** — el loader recorre `comandos/` de forma recursiva y lo detecta solo la próxima vez que reinicies el bot. `!help` también se actualiza solo: agrupa por el campo `categoria`. Si inventas una categoría nueva, aparece automáticamente, solo que sin un emoji bonito — para eso, opcionalmente agrega una línea en `NOMBRES_CATEGORIA` dentro de `comandos/utilidad/help.js`.
 
 ### Si tu comando necesita hablar con una API externa
 
-No repitas `fetch` a mano dentro del comando. Sigue el patrón de `servicios/groq.js`:
+No repitas `fetch` a mano dentro del comando. Crea `servicios/tuServicio.js` con la lógica de la llamada (fetch, headers, manejo de errores) e impórtala en tu comando. Así, si luego otro comando necesita lo mismo, ya está reutilizable.
 
-1. Crea `servicios/tuServicio.js` con la lógica de la llamada (fetch, headers, manejo de errores).
-2. Impórtala en tu comando y úsala. Así, si luego otro comando necesita lo mismo, ya está reutilizable.
+### Si tu comando necesita hablar con la API de Discord
 
-### Si tu comando necesita hablar con la API de Discord (enviar/borrar mensajes, ver canal, etc.)
+Ya existen funciones listas en `servicios/api.js` (`enviarMensaje`, `eliminarMensaje`, `editarMiembro`, `bloquearCanal`, `gestionarRolMiembro`, etc.). Impórtalas en vez de usar `discord.js` directamente.
 
-Ya existen funciones listas en `servicios/api.js`: `enviarMensaje`, `eliminarMensaje`, `eliminarMensajesEnBloque`, `obtenerMensajes`, `esAdministrador`. Impórtalas en vez de escribir un `fetch` nuevo.
+### Si tu comando actúa sobre otro usuario
+
+Llama a `validarObjetivo` de `utilidades/jerarquia.js` antes de actuar: impide que alguien se aplique la acción a sí mismo, al bot o al dueño, y que un moderador toque a otro moderador o a un administrador.
 
 ---
 
 ## 🎨 Cómo personalizar el bot
 
-Todo lo "de marca" vive en `config/constantes.js`:
+Todo lo "de marca" y los límites viven en `config/constantes.js`:
 
 ```js
 module.exports = {
@@ -164,54 +196,58 @@ module.exports = {
     ANTIFLOOD_MAX_MENSAJES: 5,
     ANTIFLOOD_VENTANA_MS: 5000,
     ANTIFLOOD_SUSPENSION_MS: 120000,
+    ANTIMENCIONES_MAX: 5,        // máximo de personas distintas mencionadas por mensaje
 };
 ```
 
-Si quieres que un comando específico use otro color en su embed, no lo hardcodees — trae `COLOR_SERVER` desde acá o pásalo como parámetro, así el día que cambies la paleta del bot solo tocas un archivo.
-
-### Cambiar la personalidad de la IA (`!kat`)
-
-El texto que define cómo habla KAT está en `servicios/groq.js`, en la constante `SYSTEM_PROMPT`. Ahí puedes ajustar tono, reglas de qué puede o no hacer, o el modelo (`MODELO`) si quieres probar otro disponible en Groq.
-
 ---
 
-## 🚀 Levantar el bot (Fedora)
+## 🚀 Levantar el bot
+
+Necesitas [Node.js](https://nodejs.org/) 18 o superior y git.
 
 ```bash
-# Si te hace falta algo de esto (probablemente ya lo tengas):
-sudo dnf install nodejs npm git -y
-sudo npm install -g pm2
-
-# Dentro de la carpeta del proyecto:
-cp .env.example .env
-nano .env          # pega tu BOT_TOKEN y GROQ_API_KEY
+git clone https://github.com/GatoCopy/KAT-BOT.git
+cd KAT-BOT
+cp .env.example .env     # en Windows (PowerShell): copy .env.example .env
+# edita .env y pega tu BOT_TOKEN
 npm install
-npm run pm2        # o: node index.js, para ver logs directo la primera vez
+node index.js            # o, con PM2 (opcional): npm install -g pm2 && npm run pm2
 ```
 
 **Antes de que arranque necesitas, en el [Developer Portal de Discord](https://discord.com/developers/applications) → tu app → Bot:**
 - Activar **Server Members Intent** y **Message Content Intent** (ambos son "Privileged Gateway Intents"). Sin esto el bot se cae al iniciar con un error `DisallowedIntents`.
-- Invitarlo a tu servidor desde OAuth2 → URL Generator, marcando el scope `bot` y los permisos que necesite (ver sección de Moderación más abajo).
+- Invitarlo a tu servidor desde OAuth2 → URL Generator, marcando el scope `bot` y los permisos de la sección de Moderación.
 
-Para ver logs en vivo:
-```bash
-pm2 logs KAT
-```
+Con PM2: `pm2 logs KAT` para ver logs y `pm2 restart KAT` para reiniciar tras cambios.
 
-Para reiniciar tras cambios (nuevos comandos, edición de `.env`, etc.):
-```bash
-pm2 restart KAT
-```
+---
 
 ## 🛡️ Moderación
 
-⚠️ **Primer paso obligatorio en cada servidor nuevo:** ejecuta `!setrol administrador <ID o mención de un rol>` (como dueño del servidor, que siempre tiene acceso). Sin esto, **nadie más que el dueño puede usar ningún comando de moderación o administración**.
+⚠️ **Primer paso obligatorio en cada servidor nuevo:** ejecuta `!setrol administrador <ID o mención de un rol>` (como dueño del servidor, que siempre tiene acceso). Sin esto, **nadie más que el dueño** (y quienes tengan permisos nativos de Administrator/Kick/Ban) puede usar los comandos de moderación o administración.
 
-Todos los comandos de moderación viven en `comandos/admin/`, así que el loader los marca con el nivel correcto automáticamente según la subcarpeta (`moderacion/` o `administracion/`).
+**Permisos que necesita el bot** (en su rol dentro del servidor):
 
-**Antes de usarlos:** el bot necesita los permisos correspondientes activados en su rol dentro del servidor — **Kick Members** para `!kick`, **Ban Members** para `!ban`/`!unban`/`!banlist`, **Timeout Members** (Moderate Members) para `!suspender`/`!desuspender`, **Manage Roles** para `!autorol`, **Manage Server** para el rastreo de invitaciones, y **Add Reactions** para que pueda poner la reacción inicial en los autoroles. El rol del bot también debe estar **por encima**, en la lista de roles del servidor, de cualquier rol que quiera asignar/quitar o de cualquier miembro que quiera moderar. Si un comando falla con un mensaje genérico de "no pude hacer X", esto es lo primero a revisar.
+| Permiso | Para qué |
+|---|---|
+| Kick Members | `!kick` |
+| Ban Members | `!ban`, `!tempban`, `!unban`, `!banlist` |
+| Moderate Members | `!suspender`, `!desuspender`, antiflood |
+| Manage Messages | `!clear` y el borrado de la auto-moderación |
+| Manage Roles | `!rol`, `!autorol`, `!lock`/`!unlock` |
+| Manage Channels | `!lock`/`!unlock`, `!slowmode` |
+| Manage Nicknames | `!nick` |
+| Manage Server | rastreo de invitaciones |
+| Add Reactions | reacción inicial de los autoroles |
 
-**Warns:** son solo un registro (no hacen nada automáticamente). A partir de 3 advertencias, `!warn` te avisa en el propio mensaje para que decidas si aplicar una suspensión o expulsión — no hay expulsión automática, a propósito, para que la decisión la siga tomando un humano.
+El rol del bot también debe estar **por encima**, en la lista de roles del servidor, de cualquier rol que quiera asignar/quitar o de cualquier miembro que quiera moderar. Si un comando falla con un mensaje genérico de "no pude hacer X", esto es lo primero a revisar.
+
+**Jerarquía:** nadie puede aplicarse una acción a sí mismo, al bot ni al dueño del servidor. Un moderador no puede moderar a otro moderador ni a un administrador, y un administrador no puede moderar a otro administrador (el dueño sí puede con todos). Con `!rol` solo se pueden dar/quitar roles que estén por debajo de tu rol más alto.
+
+**Warns:** son solo un registro (no hacen nada automáticamente). A partir de 3 advertencias, `!warn` te avisa en el propio mensaje para que decidas si aplicar una suspensión o expulsión — no hay castigo automático, a propósito, para que la decisión la siga tomando un humano.
+
+**Baneos temporales:** `!tempban` guarda el vencimiento en la base de datos; el scheduler revisa cada 15 segundos y desbanea al cumplirse. Si el bot estaba apagado cuando venció, desbanea apenas vuelve a arrancar. `!unban` o un `!ban` manual cancelan el tempban pendiente.
 
 ### Configurar un autorol paso a paso
 
@@ -225,68 +261,58 @@ Todos los comandos de moderación viven en `comandos/admin/`, así que el loader
    ```
 6. El bot reacciona solo al mensaje con ese emoji. Cualquiera que reaccione ahí recibe el rol; si quita la reacción, se lo quita.
 
-Puedes tener varios autoroles en el mismo mensaje (uno por cada emoji distinto). `!autorol lista` te muestra todos los configurados en el servidor, y `!autorol quitar <ID_mensaje> <emoji>` elimina uno.
-
----
-
-## 🧠 KAT y el contexto del servidor
-
-Con `!infokat set <texto>`, los admins le dan a `!kat` información de fondo sobre el servidor (reglas, de qué trata la comunidad, lo que sea útil). A partir de ahí, **cada** llamada a `!kat` (con o sin `!canalia` activado) incluye automáticamente:
-
-- El texto que configuraste con `!infokat`.
-- Quiénes son los administradores y moderadores **ahora mismo**, según lo configurado con `!setrol` (se calcula en vivo, no es una lista fija que se desactualice).
-
-Así, si alguien pregunta "¿cuáles son las reglas de este server?" o "¿quién es admin aquí?", KAT puede responder de verdad en vez de decir que no sabe de qué se le habla. Esto es **contexto de fondo, no de la conversación** — no incluye nada de lo que la gente esté hablando ni quién dijo qué, solo la info base del servidor.
-
-Por rendimiento, esto se cachea 5 minutos (`utilidades/cacheContextoServidor.js`) — cambios vía `!infokat` o `!setrol` invalidan la caché al instante, así que no hay que esperar.
+Puedes tener varios autoroles en el mismo mensaje (uno por cada emoji distinto). `!autorol lista` muestra todos los configurados, y `!autorol quitar <ID_mensaje> <emoji>` elimina uno.
 
 ---
 
 ## 🤖 Auto-moderación
 
-Tres sistemas independientes, cada uno con su propio on/off por servidor — puedes activar solo el que necesites.
+Cinco sistemas independientes, cada uno con su propio on/off por servidor — activa solo los que necesites. **Los moderadores y administradores están exentos de todos.**
 
 ### Logs de moderación
-`!modlogs on` en el canal que quieras usar como bitácora. A partir de ahí, **todo** lo siguiente se publica ahí automáticamente: `!kick`, `!ban`, `!unban`, `!warn`, `!delwarn`, `!suspender`, `!desuspender`, y las acciones automáticas de los tres sistemas de abajo. Si no activas `!modlogs`, todo sigue funcionando igual, solo que sin quedar registrado en ningún canal.
+`!modlogs on` en el canal que quieras usar como bitácora. A partir de ahí, **todo** lo que hagan los comandos de moderación y los sistemas de abajo se publica ahí automáticamente. Sin `!modlogs`, todo funciona igual y se guarda igual en el historial (`!historial`), solo que sin publicarse en ningún canal.
 
 ### Filtro de palabras
-`!palabraprohibida agregar <palabra>` activa el filtro automáticamente y la agrega a la lista. Cuando alguien (que no sea admin) escribe un mensaje que contiene alguna palabra de la lista, el mensaje **se borra** y se avisa en el mismo canal — **no** se genera un warn formal, es solo una limpieza automática para mantener la convivencia. Si quieres que además cuente como advertencia, tendrías que aplicar `!warn` a mano.
+`!palabraprohibida agregar <palabra>` activa el filtro automáticamente y la agrega a la lista. El mensaje **se borra** y se avisa en el canal — **no** se genera un warn formal.
 
 ### Filtro de links
-`!filtrolinks on` bloquea cualquier link (`http://`, `https://`) en canales que no estén en la whitelist. Usa `!linkscanal permitir` dentro de cada canal donde SÍ quieras permitir links (por ejemplo, un canal de `#recursos` o `#compartir`).
+`!filtrolinks on` bloquea cualquier link (`http://`, `https://`) en canales que no estén en la whitelist. Usa `!linkscanal permitir` dentro de cada canal donde SÍ quieras permitir links.
+
+### Filtro de invitaciones
+`!filtroinvitaciones on` borra mensajes con invitaciones a otros servidores de Discord (`discord.gg/...`, `discord.com/invite/...`), incluso sin `https://`.
+
+### Antimenciones
+`!antimenciones on` borra mensajes que mencionan a más de `ANTIMENCIONES_MAX` (5) personas distintas.
 
 ### Antiflood
-`!antiflood on` — si alguien manda más de 5 mensajes en 5 segundos, se le borra el mensaje que rompió el límite y se le suspende automáticamente 2 minutos (configurable en `config/constantes.js`: `ANTIFLOOD_MAX_MENSAJES`, `ANTIFLOOD_VENTANA_MS`, `ANTIFLOOD_SUSPENSION_MS`). Solo borra el mensaje que detectó el flood, no los anteriores que ya se enviaron.
+`!antiflood on` — si alguien manda más de 5 mensajes en 5 segundos, se borra el mensaje que rompió el límite y se le suspende 2 minutos (configurable en `config/constantes.js`).
 
-**Los administradores están exentos de los tres sistemas** — así puedes probarlos y seguir usando el bot con normalidad mientras están activos.
-
-**ℹ️ Sobre invitaciones:** en Discord sí es viable — el objeto de invitación trae `uses`, así que se rastrea quién entró por cuál invitación comparando conteos antes/después de un join. Ya está construido (`servicios/invites.js` + `eventos/memberAdd.js`) y se registra automáticamente en `!historial` de cada usuario. Requiere el permiso **Manage Server** en el bot; si falta, simplemente registra "no se pudo determinar" en vez de fallar.
+**ℹ️ Sobre invitaciones:** el bot rastrea quién entró por cuál invitación comparando los conteos de uso antes/después de cada entrada (`servicios/invites.js` + `eventos/memberAdd.js`); se registra en el `!historial` de cada usuario. Requiere el permiso **Manage Server**; si falta, registra "no se pudo determinar" en vez de fallar.
 
 ---
 
-## 💾 Persistencia (recordatorios y encuestas)
+## 👋 Bienvenida y despedida
 
-Estos datos se guardan en `data/kat.db` (SQLite, vía `better-sqlite3`), así que sobreviven a reinicios del bot.
+`!bienvenida on` activa un mensaje por defecto en el canal donde lo ejecutes; `!bienvenida set <mensaje>` lo personaliza. Igual con `!despedida`. Marcadores disponibles: `{usuario}` (mención), `{nombre}`, `{servidor}`, `{miembros}`. Ejemplo:
 
-- **Recordatorios:** un `setInterval` en `servicios/scheduler.js` revisa cada 15 segundos si hay recordatorios vencidos y los envía. Corre independiente del gateway de Discord, así que sigue funcionando aunque el bot esté reconectándose.
-- **Encuestas:** el voto es por **comando de texto** (`!votar <id> <número>`), no por reacciones a mensajes — así no hace falta manejar el evento de reacciones para esto todavía. Si más adelante quieres votar con reacciones (👍👎 o números como emoji), es una mejora futura que implicaría ampliar `eventos/messageReact.js` (que ahora mismo solo maneja autoroles).
-- Un usuario puede cambiar su voto votando de nuevo; solo cuenta su voto más reciente por encuesta.
+```
+!bienvenida set 🎉 ¡Bienvenido/a {usuario} a {servidor}! Ya somos {miembros}.
+```
+
+`!bienvenida probar` muestra cómo se vería. Los mensajes solo mencionan usuarios (un nombre como "@everyone" no genera ping masivo) y no se envían para bots.
+
+---
+
+## 💾 Persistencia
+
+Todo se guarda en `data/kat.db` (SQLite, vía `better-sqlite3`), así que sobrevive a reinicios: recordatorios, encuestas y votos, warns, historial de moderación, autoroles, configuración de auto-moderación, baneos temporales, bienvenida/despedida, roles de moderador/administrador.
+
+- **Recordatorios y baneos temporales:** un `setInterval` en `servicios/scheduler.js` revisa cada 15 segundos qué venció.
+- **Encuestas:** el voto es por **comando de texto** (`!votar <id> <número>`), no por reacciones. Un usuario puede cambiar su voto votando de nuevo.
+- **Migraciones:** `servicios/db.js` actualiza solo las bases de datos antiguas al arrancar (agrega columnas nuevas y elimina tablas que ya no se usan).
 
 ---
 
 ## 📌 Historial del proyecto
 
-Este bot empezó en Stoat/Revolt y se migró a Discord. El sistema de **dos niveles de permisos** (moderador vs. administrador, configurable con `!setrol`) y el comando `!historial` (que ahora también incluye el rastreo de invitaciones) están completos y funcionando.
-
----
-
-## 💬 Memoria de conversación en !kat (canal IA)
-
-Con `!canalia on` (solo admins), el canal donde lo ejecutes activa la **memoria** para `!kat`: cada vez que alguien use `!kat <pregunta>` en ese canal, la IA recuerda hasta las últimas **20 peticiones** (pregunta + respuesta) de la conversación, en vez de tratar cada pregunta de forma aislada como hace por defecto en cualquier otro canal.
-
-**Importante — sigue siendo por comando, no automático:** `!kat` sigue siendo obligatorio para que responda. `!canalia on` NO hace que responda a todo lo que se escriba sin prefijo — eso se probó y resultó ser demasiado (respondía a cada mensaje suelto del canal, con el riesgo de disparar la API de Groq constantemente). Ahora es memoria opcional, activación explícita por mensaje.
-
-**Cosas a tener en cuenta:**
-- La memoria es **compartida entre todos los que usen `!kat` en ese canal** (como una conversación grupal), no privada por persona. Cada pregunta se etiqueta con el nombre de quien la hizo para que la IA distinga quién dice qué.
-- El on/off queda guardado en `data/kat.db` (sobrevive reinicios). La conversación en sí vive en memoria (`utilidades/historialIA.js`) y se pierde si el bot se reinicia, o si apagas/prendes la memoria con `!canalia off` / `!canalia on`.
-- Al llegar a 20 peticiones guardadas, la más antigua se descarta para dar espacio a la nueva (FIFO) — conversaciones muy largas van a "olvidar" lo de más atrás, a propósito, para no disparar el tamaño/costo de cada llamada a Groq.
+Este bot empezó en Stoat/Revolt y se migró a Discord. El sistema de **dos niveles de permisos** (moderador vs. administrador, configurable con `!setrol`) y el comando `!historial` (que también incluye el rastreo de invitaciones) están completos y funcionando.

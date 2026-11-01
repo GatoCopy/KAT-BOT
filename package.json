@@ -1,7 +1,7 @@
 {
   "name": "kat-bot",
   "version": "2.1.0",
-  "description": "KAT - Bot multipropósito para Discord (moderación, utilidad, diversión, IA)",
+  "description": "KAT - Bot multipropósito para Discord (moderación, utilidad, diversión)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

@@ -1,6 +1,7 @@
 const { obtenerCanal, expulsarMiembro } = require('../../../servicios/api');
 const { registrarAccion } = require('../../../servicios/logs');
 const { limpiarId } = require('../../../utilidades/parseMencion');
+const { validarObjetivo } = require('../../../utilidades/jerarquia');
 
 module.exports = {
     nombre: 'kick',
@@ -18,6 +19,11 @@ module.exports = {
         const canal = await obtenerCanal(evento.channel);
         if (!canal?.server) {
             return await responder('⚠️ Este comando solo funciona dentro de un servidor.');
+        }
+
+        const validacion = await validarObjetivo(evento, canal.server, idObjetivo);
+        if (!validacion.ok) {
+            return await responder(`🚫 ${validacion.motivo}`);
         }
 
         const exito = await expulsarMiembro(canal.server, idObjetivo, razon);

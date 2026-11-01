@@ -38,12 +38,6 @@ db.exec(`
         PRIMARY KEY (encuesta_id, usuario_id)
     );
 
-    CREATE TABLE IF NOT EXISTS canales_ia (
-        canal_id TEXT PRIMARY KEY,
-        activado_por TEXT NOT NULL,
-        activado_en INTEGER NOT NULL
-    );
-
     CREATE TABLE IF NOT EXISTS warns (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         servidor_id TEXT NOT NULL,
@@ -91,12 +85,6 @@ db.exec(`
         PRIMARY KEY (servidor_id, canal_id)
     );
 
-    CREATE TABLE IF NOT EXISTS info_servidor (
-        servidor_id TEXT PRIMARY KEY,
-        contenido TEXT NOT NULL,
-        actualizado_en INTEGER NOT NULL
-    );
-
     CREATE TABLE IF NOT EXISTS roles_config (
         servidor_id TEXT PRIMARY KEY,
         rol_moderador_id TEXT,
@@ -121,6 +109,44 @@ db.exec(`
         invitado_por TEXT,
         creado_en INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS tempbans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        servidor_id TEXT NOT NULL,
+        usuario_id TEXT NOT NULL,
+        moderador_id TEXT NOT NULL,
+        razon TEXT,
+        expira_en INTEGER NOT NULL,
+        procesado INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS bienvenida_config (
+        servidor_id TEXT PRIMARY KEY,
+        bienvenida_canal_id TEXT,
+        bienvenida_mensaje TEXT,
+        despedida_canal_id TEXT,
+        despedida_mensaje TEXT
+    );
 `);
+
+// ---------------------------------------------------------------------------
+// Migraciones para bases de datos que ya existían antes de estos cambios.
+// Son idempotentes: se pueden ejecutar en cada arranque sin romper nada.
+// ---------------------------------------------------------------------------
+
+// Tablas de la antigua función de IA (ya no se usan).
+db.exec(`
+    DROP TABLE IF EXISTS canales_ia;
+    DROP TABLE IF EXISTS info_servidor;
+`);
+
+// Columnas nuevas de automod_config (SQLite no tiene "ADD COLUMN IF NOT EXISTS").
+const columnasAutomod = db.prepare(`PRAGMA table_info(automod_config)`).all().map(c => c.name);
+if (!columnasAutomod.includes('filtro_invitaciones_activado')) {
+    db.exec(`ALTER TABLE automod_config ADD COLUMN filtro_invitaciones_activado INTEGER NOT NULL DEFAULT 0`);
+}
+if (!columnasAutomod.includes('antimenciones_activado')) {
+    db.exec(`ALTER TABLE automod_config ADD COLUMN antimenciones_activado INTEGER NOT NULL DEFAULT 0`);
+}
 
 module.exports = db;

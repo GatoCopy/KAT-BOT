@@ -1,7 +1,6 @@
 const { obtenerCanal } = require('../../../servicios/api');
 const { configurarRol, obtenerConfigRoles } = require('../../../servicios/roles');
 const { limpiarId } = require('../../../utilidades/parseMencion');
-const { invalidar } = require('../../../utilidades/cacheContextoServidor');
 
 module.exports = {
     nombre: 'setrol',
@@ -23,7 +22,6 @@ module.exports = {
             }
 
             configurarRol(canal.server, tipo, idRol);
-            invalidar(canal.server);
             return await responder(
                 `✅ Rol de **${tipo}** configurado: <@&${idRol}>.\n` +
                 `Cualquiera con ese rol ahora tiene ese nivel de acceso en KAT.`

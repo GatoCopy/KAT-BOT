@@ -127,6 +127,7 @@ async function obtenerServidor(serverId) {
             channels: [...guild.channels.cache.keys()],
             roles: rolesObj,
             categories: categorias,
+            memberCount: guild.memberCount,
             nsfw: guild.nsfwLevel > 0,
         };
     } catch (error) {
@@ -146,21 +147,6 @@ async function obtenerMiembrosServidor(serverId) {
     } catch (error) {
         console.error('❌ Error obteniendo miembros:', error);
         return null;
-    }
-}
-
-/**
- * Retorna los IDs de todos los miembros que tienen un rol específico.
- * Se usa para que la IA sepa quiénes son los admins/mods actuales.
- */
-async function obtenerIdsConRol(serverId, rolId) {
-    try {
-        const guild = await getClient().guilds.fetch(serverId);
-        const miembros = await guild.members.fetch();
-        return [...miembros.filter(m => m.roles.cache.has(rolId)).keys()];
-    } catch (error) {
-        console.error('❌ Error obteniendo miembros con rol:', error);
-        return [];
     }
 }
 
@@ -276,6 +262,136 @@ async function agregarReaccion(channelId, messageId, emoji) {
     }
 }
 
+/**
+ * Cambia (o quita) el apodo de un miembro en el servidor. `apodo` null = quitar apodo.
+ */
+async function cambiarApodo(serverId, userId, apodo, razon) {
+    try {
+        const guild = await getClient().guilds.fetch(serverId);
+        const miembro = await guild.members.fetch(userId);
+        await miembro.setNickname(apodo, razon || undefined);
+        return true;
+    } catch (error) {
+        console.error('❌ Error cambiando apodo:', error);
+        return false;
+    }
+}
+
+/**
+ * Bloquea o desbloquea un canal de texto para @everyone (quita/restaura el permiso de enviar mensajes).
+ * Retorna { ok: true } o { ok: false, motivo }.
+ */
+async function bloquearCanal(channelId, bloquear, razon) {
+    try {
+        const canal = await getClient().channels.fetch(channelId);
+        if (!canal?.guild || !canal.isTextBased() || canal.isThread() || canal.isDMBased()) {
+            return { ok: false, motivo: 'Solo puedo bloquear canales de texto de un servidor.' };
+        }
+
+        await canal.permissionOverwrites.edit(
+            canal.guild.roles.everyone,
+            // false = denegado; null = vuelve a "heredar" (no deja un permiso explícito)
+            { SendMessages: bloquear ? false : null },
+            { reason: razon || undefined }
+        );
+        return { ok: true };
+    } catch (error) {
+        console.error('❌ Error bloqueando/desbloqueando canal:', error);
+        return { ok: false, motivo: 'No pude modificar el canal. Revisa que el bot tenga los permisos `Manage Channels` y `Manage Roles` en él.' };
+    }
+}
+
+/**
+ * Configura el modo lento de un canal. `segundos` = 0 lo desactiva (máximo 21600 = 6h).
+ */
+async function ponerModoLento(channelId, segundos, razon) {
+    try {
+        const canal = await getClient().channels.fetch(channelId);
+        if (!canal?.guild || typeof canal.setRateLimitPerUser !== 'function') return false;
+        await canal.setRateLimitPerUser(segundos, razon || undefined);
+        return true;
+    } catch (error) {
+        console.error('❌ Error configurando modo lento:', error);
+        return false;
+    }
+}
+
+/**
+ * Da o quita un rol a un miembro respetando la jerarquía de Discord:
+ * el invocador solo puede tocar roles que estén POR DEBAJO de su rol más alto
+ * (el dueño del servidor puede con todos). Así un moderador no puede darse
+ * a sí mismo ni a otros un rol de administrador a través del bot.
+ * Retorna { ok: true } o { ok: false, motivo }.
+ */
+async function gestionarRolMiembro(serverId, invocadorId, userId, rolId, accion, razon) {
+    try {
+        const guild = await getClient().guilds.fetch(serverId);
+        const rol = await guild.roles.fetch(rolId);
+        if (!rol) return { ok: false, motivo: 'No encontré ese rol en este servidor.' };
+        if (rol.id === guild.id) return { ok: false, motivo: 'No se puede dar ni quitar el rol @everyone.' };
+        if (rol.managed) return { ok: false, motivo: 'Ese rol lo gestiona una integración o bot y no se puede asignar a mano.' };
+
+        if (guild.ownerId !== invocadorId) {
+            const invocador = await guild.members.fetch(invocadorId);
+            if (rol.position >= invocador.roles.highest.position) {
+                return { ok: false, motivo: 'Solo puedes gestionar roles que estén por debajo de tu rol más alto.' };
+            }
+        }
+
+        const miembro = await guild.members.fetch(userId);
+        if (accion === 'dar') {
+            await miembro.roles.add(rol, razon || undefined);
+        } else {
+            await miembro.roles.remove(rol, razon || undefined);
+        }
+        return { ok: true, nombreRol: rol.name };
+    } catch (error) {
+        console.error('❌ Error gestionando rol de miembro:', error);
+        return { ok: false, motivo: 'No pude hacerlo. Revisa el ID/mención y que el rol del bot esté por encima de ese rol y tenga `Manage Roles`.' };
+    }
+}
+
+/**
+ * Datos de un rol para !roleinfo.
+ */
+async function obtenerRol(serverId, rolId) {
+    try {
+        const guild = await getClient().guilds.fetch(serverId);
+        const rol = await guild.roles.fetch(rolId);
+        if (!rol) return null;
+        await guild.members.fetch();
+        return {
+            id: rol.id,
+            nombre: rol.name,
+            colorHex: rol.hexColor,
+            posicion: rol.position,
+            miembros: rol.members.size,
+            mencionable: rol.mentionable,
+            separado: rol.hoist,
+            gestionado: rol.managed,
+            creadoEn: rol.createdAt,
+        };
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
+ * ¿Es este usuario el dueño del servidor?
+ */
+async function esDueno(serverId, userId) {
+    try {
+        const guild = await getClient().guilds.fetch(serverId);
+        return guild.ownerId === userId;
+    } catch (error) {
+        return false;
+    }
+}
+
+function obtenerIdBot() {
+    return getClient().user?.id || null;
+}
+
 async function esAdministrador(channelId, userId) {
     try {
         const canal = await getClient().channels.fetch(channelId);
@@ -305,7 +421,6 @@ module.exports = {
     obtenerCanal,
     obtenerServidor,
     obtenerMiembrosServidor,
-    obtenerIdsConRol,
     obtenerUsuario,
     obtenerMiembro,
     esAdministrador,
@@ -315,4 +430,11 @@ module.exports = {
     listarBaneos,
     editarMiembro,
     agregarReaccion,
+    cambiarApodo,
+    bloquearCanal,
+    ponerModoLento,
+    gestionarRolMiembro,
+    obtenerRol,
+    esDueno,
+    obtenerIdBot,
 };

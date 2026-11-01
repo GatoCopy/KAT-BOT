@@ -5,7 +5,7 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { setClient } = require('./servicios/discordClient');
 const { TOKEN } = require('./servicios/api');
 const { cargarComandos } = require('./utilidades/cargadorComandos');
-const { iniciarSchedulerRecordatorios } = require('./servicios/scheduler');
+const { iniciarSchedulerRecordatorios, iniciarSchedulerTempbans } = require('./servicios/scheduler');
 const eventos = require('./eventos');
 
 if (!TOKEN) {
@@ -33,5 +33,6 @@ for (const [nombreEvento, handler] of eventos.entries()) {
 }
 
 iniciarSchedulerRecordatorios();
+iniciarSchedulerTempbans();
 
 client.login(TOKEN);

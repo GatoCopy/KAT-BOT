@@ -1,6 +1,8 @@
 const { obtenerCanal, banearUsuario } = require('../../../servicios/api');
 const { registrarAccion } = require('../../../servicios/logs');
 const { limpiarId } = require('../../../utilidades/parseMencion');
+const { validarObjetivo } = require('../../../utilidades/jerarquia');
+const { cancelarTempbans } = require('../../../servicios/tempbans');
 
 module.exports = {
     nombre: 'ban',
@@ -20,10 +22,18 @@ module.exports = {
             return await responder('⚠️ Este comando solo funciona dentro de un servidor.');
         }
 
+        const validacion = await validarObjetivo(evento, canal.server, idObjetivo);
+        if (!validacion.ok) {
+            return await responder(`🚫 ${validacion.motivo}`);
+        }
+
         const exito = await banearUsuario(canal.server, idObjetivo, razon);
         if (!exito) {
             return await responder('❌ No pude banear a ese usuario. Verifica el ID/mención y que el bot tenga permiso `BanMembers`.');
         }
+
+        // Un ban permanente reemplaza a un tempban previo (si no, el scheduler lo desbanearía después).
+        cancelarTempbans(canal.server, idObjetivo);
 
         await registrarAccion({
             servidorId: canal.server,
